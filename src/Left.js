@@ -3,8 +3,7 @@ const Left = (value) => {
     value,
     of: (arg) => Left(arg),
     map: () => api,
-    flatMap: () => api,
-    ap: () => api
+    flatMap: () => api
   }
 
   return api;

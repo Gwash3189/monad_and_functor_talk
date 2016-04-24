@@ -5,8 +5,7 @@ const Maybe = (value) => {
     value,
     of: (arg) => Maybe(arg),
     map: (f) => Nil(value) ? Maybe(null) : Maybe(f(value)),
-    flatMap: (f) => Maybe(f(value).value),
-    ap: (maybe) => Maybe(value(maybe.value))
+    flatMap: (f) => Maybe(f(value).value)
   }
 
   return api;

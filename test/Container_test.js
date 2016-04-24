@@ -3,12 +3,10 @@ import { expect } from 'chai';
 import Container from './../../client/types/Container.js';
 
 describe('Container', function () {
-  let container,
-      apContainer;
+  let container;
 
   beforeEach(() => {
     container = Container(3);
-    apContainer = Container((x) => x + 3);
   })
 
   it('contains the value', function () {
@@ -30,9 +28,4 @@ describe('Container', function () {
     expect(container.flatMap(x => Container(x + 3)).value)
       .to.eql(6)
   });
-
-  it('applies the function in the container to the new container', () => {
-    expect(apContainer.ap(Container(3)).value)
-      .to.eql(6);
-  })
 });

@@ -5,13 +5,11 @@ import Maybe from './../../client/types/Maybe.js';
 
 describe('Maybe', function () {
   let maybe,
-      mapSpy,
-      apMaybe;
+      mapSpy;
 
   beforeEach(() => {
     mapSpy = spy();
     maybe = Maybe(3);
-    apMaybe = Maybe((x) => x + 3);
   })
 
   it('contains the value', function () {
@@ -29,16 +27,10 @@ describe('Maybe', function () {
       .to.eql(6)
   });
 
-  it('applies the function in the Maybe to the new Maybe', () => {
-    expect(apMaybe.ap(Maybe(3)).value)
-      .to.eql(6);
-  });
-
   it('returns a Nothing if it is given null or undefined', () => {
     Maybe(null).map(mapSpy);
 
     expect(mapSpy.called)
       .to.not.be.true;
-
   })
 });

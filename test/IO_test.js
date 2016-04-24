@@ -4,13 +4,10 @@ import IO from './../../client/types/IO.js';
 
 describe('IO', function () {
   const ioValue = () => 3;
-  const apIOValue = (x) => x + 3;
-  let io,
-      apIO;
+  let io;
 
   beforeEach(() => {
     io = IO(ioValue);
-    apIO = IO(apIOValue);
   })
 
   it('contains the value', function () {
@@ -27,9 +24,4 @@ describe('IO', function () {
     expect(io.flatMap(x => IO(x + 3)).perform())
       .to.eql(6)
   });
-
-  it('applies the function in the io to the new container', () => {
-    expect(apIO.ap(IO(3)).perform())
-      .to.eql(6);
-  })
 });
