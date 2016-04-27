@@ -1,30 +1,23 @@
 'use strict';
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.work = undefined;
+
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
-
-var _es6Promise = require('es6-promise');
-
-var _duxanator = require('duxanator');
-
-var _fs = require('fs');
-
-var _fs2 = _interopRequireDefault(_fs);
-
-var _isomorphicFetch = require('isomorphic-fetch');
-
-var _isomorphicFetch2 = _interopRequireDefault(_isomorphicFetch);
 
 var _IO = require('../shared/IO');
 
 var _IO2 = _interopRequireDefault(_IO);
+
+var _helpers = require('../shared/helpers');
 
 var _Continuation = require('../shared/Continuation');
 
 var _Continuation2 = _interopRequireDefault(_Continuation);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-(0, _es6Promise.polyfill)();
 
 var joinState = function joinState(updateState) {
   return function (x) {
@@ -54,17 +47,12 @@ var seconds = function seconds(x) {
   return x * 1000;
 };
 
-var repeat = function repeat(f) {
-  return {
-    every: function every(_every) {
-      f();
-      setInterval(f, _every);
-    }
-  };
-};
+var work = exports.work = (0, _helpers.thunk)(function (State, Fetch) {
+  return (0, _Continuation2.default)(Fetch).map(toJson).map(getComments).map(toMakers).map((0, _helpers.map)(State, (0, _helpers.updateState)({ comments: comments }))).map(_helpers.perform);
+});
 
-repeat(function () {
-  (0, _Continuation2.default)(function () {
-    return (0, _isomorphicFetch2.default)('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
-  }).map(toJson).map(getComments).map(toMakers).map(joinState(_duxanator.updateState)).perform();
-}).every(seconds(30));
+exports.default = function (State, Fetch) {
+  return (0, _IO2.default)(function () {
+    (0, _helpers.repeat)(work(State, Fetch)).every(seconds(30));
+  });
+};

@@ -1,10 +1,6 @@
-import { polyfill } from 'es6-promise';
-import { seedState, updateState, getState } from 'duxanator'
-import fs from 'fs';
-import fetch from 'isomorphic-fetch';
 import IO from '../shared/IO';
+import { repeat, updateState, map, perform, thunk} from '../shared/helpers';
 import Continuation from '../shared/Continuation';
-polyfill();
 
 const joinState = (updateState) => (x) => updateState((state) => ({ ...state.comments, comments: x }))
 const toJson = (r) => r.json();
@@ -13,21 +9,18 @@ const maker = ({ data : { body, author, id }}) => ({ body, author, id })
 const toMakers = (comments) => comments.map(maker);
 const seconds = (x) => x * 1000
 
-const repeat = (f) => {
-  return {
-    every: (every) => {
-      f();
-      setInterval(f, every)
-    }
-  }
-}
-
-repeat(() => {
-  Continuation(() => fetch('https://www.reddit.com/r/AskReddit/comments/.json?limit=100'))
+export const work = thunk((State, Fetch) => {
+  return Continuation(Fetch)
     .map(toJson)
     .map(getComments)
     .map(toMakers)
-    .map(joinState(updateState))
-    .perform();
+    .map(map(State, updateState({ comments })))
+    .map(perform)
 })
-.every(seconds(30));
+
+export default (State, Fetch) => {
+  return IO(() => {
+    repeat(work(State, Fetch))
+    .every(seconds(30));
+  });
+}

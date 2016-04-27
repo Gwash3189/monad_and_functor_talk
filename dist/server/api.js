@@ -18,7 +18,6 @@ exports.default = function (App, Socket, Http, Logger, Store) {
   }));
 
   return Http.map((0, _helpers.listen)(8080, function () {
-    debugger;
     Logger.ap('listening on port 8080');
   })).flatMap((0, _helpers.thunk)(Socket)).flatMap((0, _helpers.thunk)(App));
 };

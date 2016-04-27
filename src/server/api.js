@@ -8,7 +8,6 @@ export default (App, Socket, Http, Logger, Store) => {
 
   return Http
     .map(listen(8080, function () {
-      debugger;
       Logger.ap('listening on port 8080');
     }))
     .flatMap(thunk(Socket))

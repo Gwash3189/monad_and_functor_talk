@@ -20,6 +20,21 @@ var call = exports.call = function call(verb) {
     };
   };
 };
+var repeat = exports.repeat = function repeat(f) {
+  return {
+    every: function every(_every) {
+      f();
+      setInterval(f, _every);
+    }
+  };
+};
+var map = exports.map = function map(functor, func) {
+  return function () {
+    return functor.map(func);
+  };
+};
+var json = exports.json = call('json');
+var perform = exports.perform = call('perform');
 var post = exports.post = call('post');
 var listen = exports.listen = call('listen');
 var middleware = exports.middleware = call('middleware');

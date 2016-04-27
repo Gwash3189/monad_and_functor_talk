@@ -3,6 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.transformState = undefined;
 
 var _IO = require('../shared/IO');
 
@@ -12,19 +13,21 @@ var _helpers = require('../shared/helpers');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var indexById = function indexById(makers) {
-  return makers.reduce(function (obj, maker) {
-    obj[maker.id] = maker;
+var indexById = function indexById(things) {
+  return things.reduce(function (obj, thing) {
+    obj[thing.id] = thing;
     return obj;
   }, {});
 };
 
+var transformState = exports.transformState = function transformState(state) {
+  return {
+    comments: indexById(state.comments)
+  };
+};
+
 exports.default = function (Store) {
-  return Store.map((0, _helpers.middleware)(function (state) {
-    return {
-      comments: indexById(state.comments)
-    };
-  })).map((0, _helpers.seedState)({
+  return Store.map((0, _helpers.middleware)(transformState)).map((0, _helpers.seedState)({
     comments: []
   }));
 };

@@ -3,6 +3,17 @@ export const call = (verb) => (...args) => (app) => {
   app[verb](...args);
   return app
 }
+export const repeat = (f) => {
+  return {
+    every: (every) => {
+      f();
+      setInterval(f, every)
+    }
+  }
+}
+export const map = (functor, func) => () => functor.map(func)
+export const json = call('json')
+export const perform = call('perform')
 export const post = call('post');
 export const listen = call('listen');
 export const middleware = call('middleware');

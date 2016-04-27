@@ -19,9 +19,14 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 var isAMonad = function isAMonad(x) {
   return x.map && x.flatMap;
 };
+var isAString = function isAString(x) {
+  return typeof x === 'string';
+};
 
 var Continuation = function Continuation(funcOrIo) {
-  var val = isAMonad(funcOrIo) ? funcOrIo : (0, _IO2.default)(funcOrIo);
+  var val = isAMonad(funcOrIo) ? funcOrIo : isAString(funcOrIo) ? (0, _IO2.default)(function () {
+    return (0, _isomorphicFetch2.default)(funcOrIo);
+  }) : (0, _IO2.default)(funcOrIo);
 
   var api = {
     value: val,
