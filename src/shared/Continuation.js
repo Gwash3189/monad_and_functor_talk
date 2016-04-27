@@ -12,6 +12,7 @@ const Continuation = (funcOrIo) => {
   const api = {
     value: val,
     map: (f) => Continuation(api.value.map(prom => prom.then(f))),
+    flatMap: (f) => api.map(f),
     perform: () => api.value.perform()
   }
 

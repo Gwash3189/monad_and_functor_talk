@@ -30,6 +30,9 @@ var Continuation = function Continuation(funcOrIo) {
         return prom.then(f);
       }));
     },
+    flatMap: function flatMap(f) {
+      return api.map(f);
+    },
     perform: function perform() {
       return api.value.perform();
     }
