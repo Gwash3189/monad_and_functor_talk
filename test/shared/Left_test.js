@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import Left from './../../client/types/Left.js';
+import Left from './../../src/shared/Left.js';
 
 describe('Left', function () {
   let left;

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import Applicative from './../../client/types/Applicative.js';
+import Applicative from '../../src/shared/Applicative.js';
 
 describe('Applicative', function () {
   let applicative,

@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { spy } from 'sinon';
 
-import Maybe from './../../client/types/Maybe.js';
+import Maybe from './../../src/shared/Maybe.js';
 
 describe('Maybe', function () {
   let maybe,

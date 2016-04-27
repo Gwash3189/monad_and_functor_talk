@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import Container from './../../client/types/Container.js';
+import Container from '../../src/shared/Container.js';
 
 describe('Container', function () {
   let container;

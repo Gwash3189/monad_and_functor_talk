@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import IO from './../../client/types/IO.js';
+import IO from '../../src/shared/IO.js';
 
 describe('IO', function () {
   const ioValue = () => 3;
