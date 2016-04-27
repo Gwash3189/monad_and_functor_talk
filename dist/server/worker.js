@@ -47,12 +47,24 @@ var seconds = function seconds(x) {
   return x * 1000;
 };
 
-var work = exports.work = (0, _helpers.thunk)(function (State, Fetch) {
-  return (0, _Continuation2.default)(Fetch).map(toJson).map(getComments).map(toMakers).map((0, _helpers.map)(State, (0, _helpers.updateState)({ comments: comments }))).map(_helpers.perform);
-});
+var work = exports.work = function work(State, Fetch, Logger) {
+  debugger;
+  Logger.ap('Fetching comments ' + new Date());
+  return Fetch.map(toJson).map(getComments).map(toMakers).map(function (comments) {
+    Logger.ap('Running State Update ' + new Date());
+    return State.map((0, _helpers.updateState)(function (state) {
+      return _extends({}, state.comments, { comments: comments });
+    }));
+  }).map((0, _helpers.perform)()).map(function () {
+    return Logger.ap('Finished fetching comments ' + new Date());
+  });
+};
 
-exports.default = function (State, Fetch) {
+exports.default = function (State, Fetch, Logger) {
   return (0, _IO2.default)(function () {
-    (0, _helpers.repeat)(work(State, Fetch)).every(seconds(30));
+    Logger.ap('Worker running ' + new Date());
+    (0, _helpers.repeat)(function () {
+      return work(State, Fetch, Logger).perform();
+    }).every(seconds(30));
   });
 };

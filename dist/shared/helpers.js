@@ -43,4 +43,5 @@ var on = exports.on = call('on');
 var emit = exports.emit = call('emit');
 var stringify = exports.stringify = call('stringify');
 var log = exports.log = call('log');
+var updateState = exports.updateState = call('updateState');
 var ok = exports.ok = thunk({ ok: 'ok' });

@@ -20,14 +20,18 @@ var indexById = function indexById(things) {
   }, {});
 };
 
-var transformState = exports.transformState = function transformState(state) {
-  return {
-    comments: indexById(state.comments)
+var transformState = exports.transformState = function transformState(Logger) {
+  return function (state) {
+    Logger.ap('Running Middleware ' + new Date());
+
+    return {
+      comments: indexById(state.comments)
+    };
   };
 };
 
-exports.default = function (Store) {
-  return Store.map((0, _helpers.middleware)(transformState)).map((0, _helpers.seedState)({
+exports.default = function (Store, Logger) {
+  return Store.map((0, _helpers.middleware)(transformState(Logger))).map((0, _helpers.seedState)({
     comments: []
   }));
 };

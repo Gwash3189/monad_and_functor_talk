@@ -1,5 +1,5 @@
 import IO from '../shared/IO';
-import { repeat, updateState, map, perform, thunk} from '../shared/helpers';
+import { repeat, updateState, perform, thunk} from '../shared/helpers';
 import Continuation from '../shared/Continuation';
 
 const joinState = (updateState) => (x) => updateState((state) => ({ ...state.comments, comments: x }))
@@ -9,18 +9,26 @@ const maker = ({ data : { body, author, id }}) => ({ body, author, id })
 const toMakers = (comments) => comments.map(maker);
 const seconds = (x) => x * 1000
 
-export const work = thunk((State, Fetch) => {
-  return Continuation(Fetch)
+export const work = (State, Fetch, Logger) => {
+  debugger;
+  Logger.ap(`Fetching comments ${new Date()}`)
+  return Fetch
     .map(toJson)
     .map(getComments)
     .map(toMakers)
-    .map(map(State, updateState({ comments })))
-    .map(perform)
-})
+    .map((comments) => {
+      Logger.ap(`Running State Update ${new Date()}`)
+      return State
+        .map(updateState((state) => ({ ...state.comments, comments })));
+    })
+    .map(perform())
+    .map(() => Logger.ap(`Finished fetching comments ${new Date()}`))
+}
 
-export default (State, Fetch) => {
+export default (State, Fetch, Logger) => {
   return IO(() => {
-    repeat(work(State, Fetch))
+    Logger.ap(`Worker running ${new Date()}`)
+    repeat(() => work(State, Fetch, Logger).perform())
     .every(seconds(30));
   });
 }

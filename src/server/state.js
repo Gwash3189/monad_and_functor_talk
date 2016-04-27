@@ -7,15 +7,17 @@ const indexById = (things) => things.reduce((obj, thing) => {
 }, {});
 
 
-export const transformState = state => {
+export const transformState = (Logger) => (state) => {
+  Logger.ap(`Running Middleware ${new Date()}`);
+
   return {
     comments: indexById(state.comments)
   };
 }
 
-export default (Store) => {
+export default (Store, Logger) => {
   return Store
-    .map(middleware(transformState))
+    .map(middleware(transformState(Logger)))
     .map(seedState({
       comments: []
     }));

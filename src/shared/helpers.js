@@ -22,4 +22,5 @@ export const on = call('on');
 export const emit = call('emit');
 export const stringify = call('stringify');
 export const log = call('log');
+export const updateState = call('updateState');
 export const ok = thunk({ok: 'ok'});

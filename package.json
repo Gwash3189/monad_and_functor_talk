@@ -6,6 +6,7 @@
   "scripts": {
     "serve": "node ./dist/server/index.js",
     "serve:debug": "node debug ./dist/server/index.js",
+    "serve:repl": "node ./dist/server/repl.js",
     "build": "babel ./src --out-dir ./dist --ignore [./src/client/**/*.js]",
     "build:watch": "babel ./src --out-dir ./dist --watch --ignore [./src/client/**/*.js]",
     "test": "mocha --compilers js:babel-register './test/**/*.js'",
