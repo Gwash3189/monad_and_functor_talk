@@ -20,7 +20,7 @@ describe('State', () => {
         }
       ];
 
-      result = transformState({ comments });
+      result = transformState({ ap: () => true })({ comments });
     })
 
     it('indexes comments by id', () => {
