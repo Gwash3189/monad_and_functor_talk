@@ -28,6 +28,15 @@ var repeat = exports.repeat = function repeat(f) {
     }
   };
 };
+var run = exports.run = function run() {
+  for (var _len2 = arguments.length, ios = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+    ios[_key2] = arguments[_key2];
+  }
+
+  return ios.forEach(function (io) {
+    return io.perform();
+  });
+};
 var map = exports.map = function map(functor, func) {
   return function () {
     return functor.map(func);

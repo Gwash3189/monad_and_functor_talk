@@ -20,7 +20,7 @@ const app = express();
 const http = Server(app);
 const socket = socketIO(http);
 const logger = (...x) => {
-  console.log(...x);
+  console.log(...x, new Date());
   return logger;
 }
 const Logger = Applicative(logger);

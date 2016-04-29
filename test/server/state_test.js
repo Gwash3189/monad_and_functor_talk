@@ -33,7 +33,7 @@ describe('State', () => {
   });
 
   describe('Store', () => {
-    let mockDuxanator = { middleware: spy(), seedState: spy() }
+    let mockDuxanator = { middleware: spy(), listen: spy(), seedState: spy() }
     let mockIO = {
       map: (f) => {
         f(mockDuxanator)

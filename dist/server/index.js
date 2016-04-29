@@ -64,7 +64,11 @@ var socket = (0, _socket2.default)(http);
 var logger = function logger() {
   var _console;
 
-  (_console = console).log.apply(_console, arguments);
+  for (var _len = arguments.length, x = Array(_len), _key = 0; _key < _len; _key++) {
+    x[_key] = arguments[_key];
+  }
+
+  (_console = console).log.apply(_console, x.concat([new Date()]));
   return logger;
 };
 var Logger = (0, _Applicative2.default)(logger);

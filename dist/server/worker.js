@@ -38,7 +38,8 @@ var maker = function maker(_ref2) {
   var body = _ref2$data.body;
   var author = _ref2$data.author;
   var id = _ref2$data.id;
-  return { body: body, author: author, id: id };
+  var over_18 = _ref2$data.over_18;
+  return { body: body, author: author, id: id, over_18: over_18 };
 };
 var toMakers = function toMakers(comments) {
   return comments.map(maker);
@@ -48,23 +49,22 @@ var seconds = function seconds(x) {
 };
 
 var work = exports.work = function work(State, Fetch, Logger) {
-  debugger;
-  Logger.ap('Fetching comments ' + new Date());
+  Logger.ap('Fetching comments');
   return Fetch.map(toJson).map(getComments).map(toMakers).map(function (comments) {
-    Logger.ap('Running State Update ' + new Date());
+    Logger.ap('Running State Update');
     return State.map((0, _helpers.updateState)(function (state) {
       return _extends({}, state.comments, { comments: comments });
     }));
   }).map((0, _helpers.perform)()).map(function () {
-    return Logger.ap('Finished fetching comments ' + new Date());
+    return Logger.ap('Finished fetching comments');
   });
 };
 
 exports.default = function (State, Fetch, Logger) {
   return (0, _IO2.default)(function () {
-    Logger.ap('Worker running ' + new Date());
+    Logger.ap('Worker running');
     (0, _helpers.repeat)(function () {
-      return work(State, Fetch, Logger).perform();
+      return (0, _helpers.run)(work(State, Fetch, Logger));
     }).every(seconds(30));
   });
 };

@@ -11,6 +11,7 @@ export const repeat = (f) => {
     }
   }
 }
+export const run = (...ios) => ios.forEach(io => io.perform())
 export const map = (functor, func) => () => functor.map(func)
 export const json = call('json')
 export const perform = call('perform')

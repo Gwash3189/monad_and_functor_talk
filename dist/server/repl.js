@@ -71,7 +71,7 @@ var logger = function logger() {
     x[_key] = arguments[_key];
   }
 
-  logs.push(x);
+  logs.push.apply(logs, x.concat([new Date()]));
   return logger;
 };
 var Logger = (0, _Applicative2.default)(logger);
@@ -92,6 +92,7 @@ var replServer = _repl2.default.start({
   prompt: "CommentStream > "
 });
 
+replServer.context.getState = _duxanator.getState;
 replServer.context.State = State;
 replServer.context.Logs = logs;
 replServer.context.Fetch = Fetch;

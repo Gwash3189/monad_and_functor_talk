@@ -22,7 +22,7 @@ const http = Server(app);
 const socket = socketIO(http);
 const logs = [];
 const logger = (...x) => {
-  logs.push(x);
+  logs.push(...x, new Date());
   return logger;
 }
 const Logger = Applicative(logger);
@@ -42,6 +42,7 @@ const replServer = repl.start({
 });
 
 
+replServer.context.getState = getState;
 replServer.context.State = State;
 replServer.context.Logs = logs;
 replServer.context.Fetch = Fetch;
