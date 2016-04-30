@@ -11,7 +11,11 @@ export const repeat = (f) => {
     }
   }
 }
+export const currentData = (e) => e.data.currentData;
+export const pluck = (path) => (obj) => obj[path];
 export const run = (...ios) => ios.forEach(io => io.perform())
+export const set = call('set');
+export const merge = call('merge');
 export const map = (functor, func) => () => functor.map(func)
 export const json = call('json')
 export const perform = call('perform')

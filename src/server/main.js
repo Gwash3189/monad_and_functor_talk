@@ -1,6 +1,7 @@
-export default (state, worker, api) => (State, Logger, Fetch, App, Socket, Http) => {
+import { run } from '../shared/helpers';
+
+export default (worker, api) => (State, Logger, Fetch, App, Socket, Http) => {
   run(
-    state(State, Logger)
     worker(State, Fetch, Logger),
     api(
       App,

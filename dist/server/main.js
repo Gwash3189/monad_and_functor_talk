@@ -1,13 +1,13 @@
-"use strict";
+'use strict';
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-exports.default = function (state, worker, api) {
+var _helpers = require('../shared/helpers');
+
+exports.default = function (worker, api) {
   return function (State, Logger, Fetch, App, Socket, Http) {
-    state(State, Logger).perform();
-    worker(State, Fetch, Logger).perform();
-    api(App, Socket, Http, Logger, State).perform();
+    (0, _helpers.run)(worker(State, Fetch, Logger), api(App, Socket, Http, Logger, State));
   };
 };

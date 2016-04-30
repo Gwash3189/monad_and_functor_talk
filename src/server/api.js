@@ -1,17 +1,21 @@
 import IO from '../shared/IO';
-import { thunk, call, post, listen, on, emit, stringify, log, ok } from '../shared/helpers';
+import { thunk, call, pluck, post, currentData, listen, on, emit, stringify, log, ok } from '../shared/helpers';
 
-export default (App, Socket, Http, Logger, Store) => {
+export default (App, Socket, Http, Logger, State) => {
   return IO(() => {
     return Http.map(listen(8080, function () {
-      Logger.ap('listening on port 8080');
+      Logger.ap('Listening on port 8080');
     }))
     .flatMap(thunk(Socket))
     .flatMap(thunk(App))
-
-    Store.map(listen((state) => {
-      Logger.ap('Emmiting new state');
-      Socket.map(emit('comments', state));
-    }));
+  })
+  .flatMap(() => {
+    return State
+      .map(pluck('comments'))
+      .map(on('update', (e) => {
+        Logger.ap('Emmiting new Comments');
+        Socket.map(emit('comments'), currentData(e))
+        Logger.ap(`Total Number: ${Object.keys(currentData(e)).length}`);
+      }));
   });
 };

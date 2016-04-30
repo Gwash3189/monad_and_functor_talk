@@ -5,27 +5,18 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.work = undefined;
 
-var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
-
 var _IO = require('../shared/IO');
 
 var _IO2 = _interopRequireDefault(_IO);
-
-var _helpers = require('../shared/helpers');
 
 var _Continuation = require('../shared/Continuation');
 
 var _Continuation2 = _interopRequireDefault(_Continuation);
 
+var _helpers = require('../shared/helpers');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var joinState = function joinState(updateState) {
-  return function (x) {
-    return updateState(function (state) {
-      return _extends({}, state.comments, { comments: x });
-    });
-  };
-};
 var toJson = function toJson(r) {
   return r.json();
 };
@@ -47,15 +38,20 @@ var toMakers = function toMakers(comments) {
 var seconds = function seconds(x) {
   return x * 1000;
 };
+var indexById = function indexById(things) {
+  return things.reduce(function (obj, thing) {
+    obj[thing.id] = thing;
+    return obj;
+  }, {});
+};
 
 var work = exports.work = function work(State, Fetch, Logger) {
   Logger.ap('Fetching comments');
   return Fetch.map(toJson).map(getComments).map(toMakers).map(function (comments) {
-    Logger.ap('Running State Update');
-    return State.map((0, _helpers.updateState)(function (state) {
-      return _extends({}, state.comments, { comments: comments });
-    }));
-  }).map((0, _helpers.perform)()).map(function () {
+    return State.map((0, _helpers.pluck)('comments')).map((0, _helpers.merge)(indexById(comments))).map(function () {
+      return Logger.ap('Running State Update');
+    });
+  }).map(_helpers.run).map(function () {
     return Logger.ap('Finished fetching comments');
   });
 };

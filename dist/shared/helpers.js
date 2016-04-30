@@ -28,6 +28,14 @@ var repeat = exports.repeat = function repeat(f) {
     }
   };
 };
+var currentData = exports.currentData = function currentData(e) {
+  return e.data.currentData;
+};
+var pluck = exports.pluck = function pluck(path) {
+  return function (obj) {
+    return obj[path];
+  };
+};
 var run = exports.run = function run() {
   for (var _len2 = arguments.length, ios = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
     ios[_key2] = arguments[_key2];
@@ -37,6 +45,8 @@ var run = exports.run = function run() {
     return io.perform();
   });
 };
+var set = exports.set = call('set');
+var merge = exports.merge = call('merge');
 var map = exports.map = function map(functor, func) {
   return function () {
     return functor.map(func);

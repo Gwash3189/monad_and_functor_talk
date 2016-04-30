@@ -12,15 +12,16 @@ var _helpers = require('../shared/helpers');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-exports.default = function (App, Socket, Http, Logger, Store) {
+exports.default = function (App, Socket, Http, Logger, State) {
   return (0, _IO2.default)(function () {
     return Http.map((0, _helpers.listen)(8080, function () {
-      Logger.ap('listening on port 8080');
+      Logger.ap('Listening on port 8080');
     })).flatMap((0, _helpers.thunk)(Socket)).flatMap((0, _helpers.thunk)(App));
-
-    Store.map((0, _helpers.listen)(function (state) {
-      Logger.ap('Emmiting new state');
-      Socket.map((0, _helpers.emit)('comments', state));
+  }).flatMap(function () {
+    return State.map((0, _helpers.pluck)('comments')).map((0, _helpers.on)('update', function (e) {
+      Logger.ap('Emmiting new Comments');
+      Socket.map((0, _helpers.emit)('comments'), (0, _helpers.currentData)(e));
+      Logger.ap('Total Number: ' + Object.keys((0, _helpers.currentData)(e)).length);
     }));
   });
 };
