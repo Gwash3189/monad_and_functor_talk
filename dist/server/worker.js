@@ -9,10 +9,6 @@ var _IO = require('../shared/IO');
 
 var _IO2 = _interopRequireDefault(_IO);
 
-var _Continuation = require('../shared/Continuation');
-
-var _Continuation2 = _interopRequireDefault(_Continuation);
-
 var _helpers = require('../shared/helpers');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -40,6 +36,9 @@ var seconds = function seconds(x) {
 };
 var indexById = function indexById(things) {
   return things.reduce(function (obj, thing) {
+    /*
+      eslint no-param-reassign: "off"
+    */
     obj[thing.id] = thing;
     return obj;
   }, {});
@@ -48,19 +47,14 @@ var indexById = function indexById(things) {
 var work = exports.work = function work(State, Fetch, Logger) {
   Logger.ap('Fetching comments');
   return Fetch.map(toJson).map(getComments).map(toMakers).map(function (comments) {
-    return State.map((0, _helpers.pluck)('comments')).map((0, _helpers.merge)(indexById(comments))).map(function () {
+    (0, _helpers.run)(State.map((0, _helpers.pluck)('comments')).map((0, _helpers.merge)(indexById(comments))).map(function () {
       return Logger.ap('Running State Update');
-    });
-  }).map(_helpers.run).map(function () {
+    }));
+  }).map(function () {
     return Logger.ap('Finished fetching comments');
   });
 };
 
 exports.default = function (State, Fetch, Logger) {
-  return (0, _IO2.default)(function () {
-    Logger.ap('Worker running');
-    (0, _helpers.repeat)(function () {
-      return (0, _helpers.run)(work(State, Fetch, Logger));
-    }).every(seconds(30));
-  });
+  return (0, _helpers.repeat)(work(State, Fetch, Logger).map(Logger.ap('Worker running...'))).every(seconds(30));
 };

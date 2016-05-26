@@ -20,8 +20,7 @@ exports.default = function (App, Socket, Http, Logger, State) {
   }).flatMap(function () {
     return State.map((0, _helpers.pluck)('comments')).map((0, _helpers.on)('update', function (e) {
       Logger.ap('Emmiting new Comments');
-      Socket.map((0, _helpers.emit)('comments'), (0, _helpers.currentData)(e));
-      Logger.ap('Total Number: ' + Object.keys((0, _helpers.currentData)(e)).length);
+      Socket.map((0, _helpers.emit)('comments', (0, _helpers.diff)((0, _helpers.previousData)(e), (0, _helpers.currentData)(e))));
     }));
   });
 };
