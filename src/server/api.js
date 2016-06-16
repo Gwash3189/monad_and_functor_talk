@@ -1,28 +1,31 @@
-// @flow
-
-import IO from '../shared/IO';
-import type { Monad, IOMonad} from '../types';
-import { thunk,
+import {
   pluck,
   currentData,
   previousData,
-  listen,
   on,
   emit,
+  json,
   diff,
+  run
 } from '../shared/helpers';
 
-export default (App: Monad, Socket: Monad, Http: Monad, Logger: Monad, State: IOMonad) => IO(() => {
-  return Http.map(listen(8080, () => {
+export default ({ app, Socket, http, Logger, State }) => {
+  app.get('/comments', (req, res) => {
+    run(
+      State
+      .map(pluck('comments'))
+      .map(comments => res.map(json(comments.get())))
+    );
+  });
+
+  http.listen(8080, () => {
     Logger.ap('Listening on port 8080');
-  }))
-  .flatMap(thunk(Socket))
-  .flatMap(thunk(App));
-})
-.flatMap(() => State
+  });
+
+  return State
     .map(pluck('comments'))
-    .map(on('update', (e: { data: { previousData: any, currentData: any } }) => {
+    .flatMap(on('update', (e) => {
       Logger.ap('Emmiting new Comments');
-      Socket.map(emit('comments', diff(previousData(e), currentData(e))));
-    }))
-);
+      run(Socket.map(emit('comments', diff(previousData(e), currentData(e)))));
+    }));
+};

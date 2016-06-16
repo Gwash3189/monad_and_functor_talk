@@ -18,4 +18,4 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 (0, _es6Promise.polyfill)();
 
-(0, _main2.default)(_worker2.default, _api2.default);
+(0, _main2.default)({ worker: _worker2.default, api: _api2.default });

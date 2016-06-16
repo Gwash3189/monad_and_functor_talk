@@ -5,4 +5,4 @@ import api from './api';
 import main from './main';
 import worker from './worker';
 
-main(worker, api);
+main({ worker, api });

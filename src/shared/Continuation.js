@@ -1,4 +1,3 @@
-import { compose } from 'ramda';
 import fetch from 'isomorphic-fetch';
 import IO from './IO';
 

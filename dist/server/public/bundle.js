@@ -54,21 +54,61 @@
 	
 	var _reactDom2 = _interopRequireDefault(_reactDom);
 	
-	var _IO = __webpack_require__(170);
+	var _socket = __webpack_require__(170);
+	
+	var _socket2 = _interopRequireDefault(_socket);
+	
+	var _baobab = __webpack_require__(219);
+	
+	var _baobab2 = _interopRequireDefault(_baobab);
+	
+	var _IO = __webpack_require__(227);
 	
 	var _IO2 = _interopRequireDefault(_IO);
 	
-	var _CommentList = __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module \"./CommentList\""); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+	var _Continuation = __webpack_require__(228);
 	
-	var _CommentList2 = _interopRequireDefault(_CommentList);
+	var _Continuation2 = _interopRequireDefault(_Continuation);
 	
-	var _helpers = __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module \"../shared/helpers\""); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+	var _CommentsList = __webpack_require__(231);
+	
+	var _CommentsList2 = _interopRequireDefault(_CommentsList);
+	
+	var _helpers = __webpack_require__(232);
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
 	
-	var Dom = (0, _IO2.default)(_reactDom2.default);
+	var Deps = (0, _IO2.default)({
+	  document: document,
+	  dom: _reactDom2.default,
+	  socket: (0, _IO2.default)((0, _socket2.default)()),
+	  state: (0, _IO2.default)(new _baobab2.default({ comments: {} })),
+	  comments: (0, _Continuation2.default)('/comments')
+	});
+	
+	(0, _helpers.run)(Deps.map(function (_ref) {
+	  var document = _ref.document;
+	  var dom = _ref.dom;
+	  var socket = _ref.socket;
+	  var state = _ref.state;
+	  var comments = _ref.comments;
+	
+	  dom.render((0, _CommentsList2.default)({ socket: socket, state: state }), document.getElementById('main'));
+	
+	  return { state: state, comments: comments };
+	}).map(function (_ref2) {
+	  var comments = _ref2.comments;
+	  var state = _ref2.state;
+	  return { comments: comments.map(_helpers.toJson), state: state };
+	}).map(function (_ref3) {
+	  var comments = _ref3.comments;
+	  var state = _ref3.state;
+	  return comments.map(function (comments) {
+	    return state.map((0, _helpers.merge)({ comments: comments }));
+	  }).map(_helpers.run);
+	}).map(_helpers.run));
 
 /***/ },
 /* 1 */
@@ -20424,31 +20464,12829 @@
 
 /***/ },
 /* 170 */
-/***/ function(module, exports) {
+/***/ function(module, exports, __webpack_require__) {
 
-	import { compose } from 'ramda';
 	
-	const thunk = (x) => () => x
-	const isAFunction = (x) => typeof x === 'function'
+	/**
+	 * Module dependencies.
+	 */
 	
-	const IO = (value) => {
-	  const val = isAFunction(value)
-	            ? value
-	            : () => value;
+	var url = __webpack_require__(171);
+	var parser = __webpack_require__(176);
+	var Manager = __webpack_require__(184);
+	var debug = __webpack_require__(173)('socket.io-client');
 	
-	  const api = {
-	    value:  val,
-	    perform: () => api.value(),
-	    of: (x) => IO(x),
-	    map: (func) => IO(compose(func, api.value)),
-	    flatMap: (func) => IO(func(api.value()).value)
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = exports = lookup;
+	
+	/**
+	 * Managers cache.
+	 */
+	
+	var cache = exports.managers = {};
+	
+	/**
+	 * Looks up an existing `Manager` for multiplexing.
+	 * If the user summons:
+	 *
+	 *   `io('http://localhost/a');`
+	 *   `io('http://localhost/b');`
+	 *
+	 * We reuse the existing instance based on same scheme/port/host,
+	 * and we initialize sockets for each namespace.
+	 *
+	 * @api public
+	 */
+	
+	function lookup(uri, opts) {
+	  if (typeof uri == 'object') {
+	    opts = uri;
+	    uri = undefined;
 	  }
 	
-	  return api;
+	  opts = opts || {};
+	
+	  var parsed = url(uri);
+	  var source = parsed.source;
+	  var id = parsed.id;
+	  var path = parsed.path;
+	  var sameNamespace = cache[id] && path in cache[id].nsps;
+	  var newConnection = opts.forceNew || opts['force new connection'] ||
+	                      false === opts.multiplex || sameNamespace;
+	
+	  var io;
+	
+	  if (newConnection) {
+	    debug('ignoring socket cache for %s', source);
+	    io = Manager(source, opts);
+	  } else {
+	    if (!cache[id]) {
+	      debug('new io instance for %s', source);
+	      cache[id] = Manager(source, opts);
+	    }
+	    io = cache[id];
+	  }
+	
+	  return io.socket(parsed.path);
 	}
 	
-	export default IO
+	/**
+	 * Protocol version.
+	 *
+	 * @api public
+	 */
+	
+	exports.protocol = parser.protocol;
+	
+	/**
+	 * `connect`.
+	 *
+	 * @param {String} uri
+	 * @api public
+	 */
+	
+	exports.connect = lookup;
+	
+	/**
+	 * Expose constructors for standalone build.
+	 *
+	 * @api public
+	 */
+	
+	exports.Manager = __webpack_require__(184);
+	exports.Socket = __webpack_require__(211);
 
+
+/***/ },
+/* 171 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {
+	/**
+	 * Module dependencies.
+	 */
+	
+	var parseuri = __webpack_require__(172);
+	var debug = __webpack_require__(173)('socket.io-client:url');
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = url;
+	
+	/**
+	 * URL parser.
+	 *
+	 * @param {String} url
+	 * @param {Object} An object meant to mimic window.location.
+	 *                 Defaults to window.location.
+	 * @api public
+	 */
+	
+	function url(uri, loc){
+	  var obj = uri;
+	
+	  // default to window.location
+	  var loc = loc || global.location;
+	  if (null == uri) uri = loc.protocol + '//' + loc.host;
+	
+	  // relative path support
+	  if ('string' == typeof uri) {
+	    if ('/' == uri.charAt(0)) {
+	      if ('/' == uri.charAt(1)) {
+	        uri = loc.protocol + uri;
+	      } else {
+	        uri = loc.host + uri;
+	      }
+	    }
+	
+	    if (!/^(https?|wss?):\/\//.test(uri)) {
+	      debug('protocol-less url %s', uri);
+	      if ('undefined' != typeof loc) {
+	        uri = loc.protocol + '//' + uri;
+	      } else {
+	        uri = 'https://' + uri;
+	      }
+	    }
+	
+	    // parse
+	    debug('parse %s', uri);
+	    obj = parseuri(uri);
+	  }
+	
+	  // make sure we treat `localhost:80` and `localhost` equally
+	  if (!obj.port) {
+	    if (/^(http|ws)$/.test(obj.protocol)) {
+	      obj.port = '80';
+	    }
+	    else if (/^(http|ws)s$/.test(obj.protocol)) {
+	      obj.port = '443';
+	    }
+	  }
+	
+	  obj.path = obj.path || '/';
+	
+	  var ipv6 = obj.host.indexOf(':') !== -1;
+	  var host = ipv6 ? '[' + obj.host + ']' : obj.host;
+	
+	  // define unique id
+	  obj.id = obj.protocol + '://' + host + ':' + obj.port;
+	  // define href
+	  obj.href = obj.protocol + '://' + host + (loc && loc.port == obj.port ? '' : (':' + obj.port));
+	
+	  return obj;
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 172 */
+/***/ function(module, exports) {
+
+	/**
+	 * Parses an URI
+	 *
+	 * @author Steven Levithan <stevenlevithan.com> (MIT license)
+	 * @api private
+	 */
+	
+	var re = /^(?:(?![^:@]+:[^:@\/]*@)(http|https|ws|wss):\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?((?:[a-f0-9]{0,4}:){2,7}[a-f0-9]{0,4}|[^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
+	
+	var parts = [
+	    'source', 'protocol', 'authority', 'userInfo', 'user', 'password', 'host', 'port', 'relative', 'path', 'directory', 'file', 'query', 'anchor'
+	];
+	
+	module.exports = function parseuri(str) {
+	    var src = str,
+	        b = str.indexOf('['),
+	        e = str.indexOf(']');
+	
+	    if (b != -1 && e != -1) {
+	        str = str.substring(0, b) + str.substring(b, e).replace(/:/g, ';') + str.substring(e, str.length);
+	    }
+	
+	    var m = re.exec(str || ''),
+	        uri = {},
+	        i = 14;
+	
+	    while (i--) {
+	        uri[parts[i]] = m[i] || '';
+	    }
+	
+	    if (b != -1 && e != -1) {
+	        uri.source = src;
+	        uri.host = uri.host.substring(1, uri.host.length - 1).replace(/;/g, ':');
+	        uri.authority = uri.authority.replace('[', '').replace(']', '').replace(/;/g, ':');
+	        uri.ipv6uri = true;
+	    }
+	
+	    return uri;
+	};
+
+
+/***/ },
+/* 173 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	/**
+	 * This is the web browser implementation of `debug()`.
+	 *
+	 * Expose `debug()` as the module.
+	 */
+	
+	exports = module.exports = __webpack_require__(174);
+	exports.log = log;
+	exports.formatArgs = formatArgs;
+	exports.save = save;
+	exports.load = load;
+	exports.useColors = useColors;
+	exports.storage = 'undefined' != typeof chrome
+	               && 'undefined' != typeof chrome.storage
+	                  ? chrome.storage.local
+	                  : localstorage();
+	
+	/**
+	 * Colors.
+	 */
+	
+	exports.colors = [
+	  'lightseagreen',
+	  'forestgreen',
+	  'goldenrod',
+	  'dodgerblue',
+	  'darkorchid',
+	  'crimson'
+	];
+	
+	/**
+	 * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+	 * and the Firebug extension (any Firefox version) are known
+	 * to support "%c" CSS customizations.
+	 *
+	 * TODO: add a `localStorage` variable to explicitly enable/disable colors
+	 */
+	
+	function useColors() {
+	  // is webkit? http://stackoverflow.com/a/16459606/376773
+	  return ('WebkitAppearance' in document.documentElement.style) ||
+	    // is firebug? http://stackoverflow.com/a/398120/376773
+	    (window.console && (console.firebug || (console.exception && console.table))) ||
+	    // is firefox >= v31?
+	    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+	    (navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31);
+	}
+	
+	/**
+	 * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+	 */
+	
+	exports.formatters.j = function(v) {
+	  return JSON.stringify(v);
+	};
+	
+	
+	/**
+	 * Colorize log arguments if enabled.
+	 *
+	 * @api public
+	 */
+	
+	function formatArgs() {
+	  var args = arguments;
+	  var useColors = this.useColors;
+	
+	  args[0] = (useColors ? '%c' : '')
+	    + this.namespace
+	    + (useColors ? ' %c' : ' ')
+	    + args[0]
+	    + (useColors ? '%c ' : ' ')
+	    + '+' + exports.humanize(this.diff);
+	
+	  if (!useColors) return args;
+	
+	  var c = 'color: ' + this.color;
+	  args = [args[0], c, 'color: inherit'].concat(Array.prototype.slice.call(args, 1));
+	
+	  // the final "%c" is somewhat tricky, because there could be other
+	  // arguments passed either before or after the %c, so we need to
+	  // figure out the correct index to insert the CSS into
+	  var index = 0;
+	  var lastC = 0;
+	  args[0].replace(/%[a-z%]/g, function(match) {
+	    if ('%%' === match) return;
+	    index++;
+	    if ('%c' === match) {
+	      // we only are interested in the *last* %c
+	      // (the user may have provided their own)
+	      lastC = index;
+	    }
+	  });
+	
+	  args.splice(lastC, 0, c);
+	  return args;
+	}
+	
+	/**
+	 * Invokes `console.log()` when available.
+	 * No-op when `console.log` is not a "function".
+	 *
+	 * @api public
+	 */
+	
+	function log() {
+	  // this hackery is required for IE8/9, where
+	  // the `console.log` function doesn't have 'apply'
+	  return 'object' === typeof console
+	    && console.log
+	    && Function.prototype.apply.call(console.log, console, arguments);
+	}
+	
+	/**
+	 * Save `namespaces`.
+	 *
+	 * @param {String} namespaces
+	 * @api private
+	 */
+	
+	function save(namespaces) {
+	  try {
+	    if (null == namespaces) {
+	      exports.storage.removeItem('debug');
+	    } else {
+	      exports.storage.debug = namespaces;
+	    }
+	  } catch(e) {}
+	}
+	
+	/**
+	 * Load `namespaces`.
+	 *
+	 * @return {String} returns the previously persisted debug modes
+	 * @api private
+	 */
+	
+	function load() {
+	  var r;
+	  try {
+	    r = exports.storage.debug;
+	  } catch(e) {}
+	  return r;
+	}
+	
+	/**
+	 * Enable namespaces listed in `localStorage.debug` initially.
+	 */
+	
+	exports.enable(load());
+	
+	/**
+	 * Localstorage attempts to return the localstorage.
+	 *
+	 * This is necessary because safari throws
+	 * when a user disables cookies/localstorage
+	 * and you attempt to access it.
+	 *
+	 * @return {LocalStorage}
+	 * @api private
+	 */
+	
+	function localstorage(){
+	  try {
+	    return window.localStorage;
+	  } catch (e) {}
+	}
+
+
+/***/ },
+/* 174 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	/**
+	 * This is the common logic for both the Node.js and web browser
+	 * implementations of `debug()`.
+	 *
+	 * Expose `debug()` as the module.
+	 */
+	
+	exports = module.exports = debug;
+	exports.coerce = coerce;
+	exports.disable = disable;
+	exports.enable = enable;
+	exports.enabled = enabled;
+	exports.humanize = __webpack_require__(175);
+	
+	/**
+	 * The currently active debug mode names, and names to skip.
+	 */
+	
+	exports.names = [];
+	exports.skips = [];
+	
+	/**
+	 * Map of special "%n" handling functions, for the debug "format" argument.
+	 *
+	 * Valid key names are a single, lowercased letter, i.e. "n".
+	 */
+	
+	exports.formatters = {};
+	
+	/**
+	 * Previously assigned color.
+	 */
+	
+	var prevColor = 0;
+	
+	/**
+	 * Previous log timestamp.
+	 */
+	
+	var prevTime;
+	
+	/**
+	 * Select a color.
+	 *
+	 * @return {Number}
+	 * @api private
+	 */
+	
+	function selectColor() {
+	  return exports.colors[prevColor++ % exports.colors.length];
+	}
+	
+	/**
+	 * Create a debugger with the given `namespace`.
+	 *
+	 * @param {String} namespace
+	 * @return {Function}
+	 * @api public
+	 */
+	
+	function debug(namespace) {
+	
+	  // define the `disabled` version
+	  function disabled() {
+	  }
+	  disabled.enabled = false;
+	
+	  // define the `enabled` version
+	  function enabled() {
+	
+	    var self = enabled;
+	
+	    // set `diff` timestamp
+	    var curr = +new Date();
+	    var ms = curr - (prevTime || curr);
+	    self.diff = ms;
+	    self.prev = prevTime;
+	    self.curr = curr;
+	    prevTime = curr;
+	
+	    // add the `color` if not set
+	    if (null == self.useColors) self.useColors = exports.useColors();
+	    if (null == self.color && self.useColors) self.color = selectColor();
+	
+	    var args = Array.prototype.slice.call(arguments);
+	
+	    args[0] = exports.coerce(args[0]);
+	
+	    if ('string' !== typeof args[0]) {
+	      // anything else let's inspect with %o
+	      args = ['%o'].concat(args);
+	    }
+	
+	    // apply any `formatters` transformations
+	    var index = 0;
+	    args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
+	      // if we encounter an escaped % then don't increase the array index
+	      if (match === '%%') return match;
+	      index++;
+	      var formatter = exports.formatters[format];
+	      if ('function' === typeof formatter) {
+	        var val = args[index];
+	        match = formatter.call(self, val);
+	
+	        // now we need to remove `args[index]` since it's inlined in the `format`
+	        args.splice(index, 1);
+	        index--;
+	      }
+	      return match;
+	    });
+	
+	    if ('function' === typeof exports.formatArgs) {
+	      args = exports.formatArgs.apply(self, args);
+	    }
+	    var logFn = enabled.log || exports.log || console.log.bind(console);
+	    logFn.apply(self, args);
+	  }
+	  enabled.enabled = true;
+	
+	  var fn = exports.enabled(namespace) ? enabled : disabled;
+	
+	  fn.namespace = namespace;
+	
+	  return fn;
+	}
+	
+	/**
+	 * Enables a debug mode by namespaces. This can include modes
+	 * separated by a colon and wildcards.
+	 *
+	 * @param {String} namespaces
+	 * @api public
+	 */
+	
+	function enable(namespaces) {
+	  exports.save(namespaces);
+	
+	  var split = (namespaces || '').split(/[\s,]+/);
+	  var len = split.length;
+	
+	  for (var i = 0; i < len; i++) {
+	    if (!split[i]) continue; // ignore empty strings
+	    namespaces = split[i].replace(/\*/g, '.*?');
+	    if (namespaces[0] === '-') {
+	      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+	    } else {
+	      exports.names.push(new RegExp('^' + namespaces + '$'));
+	    }
+	  }
+	}
+	
+	/**
+	 * Disable debug output.
+	 *
+	 * @api public
+	 */
+	
+	function disable() {
+	  exports.enable('');
+	}
+	
+	/**
+	 * Returns true if the given mode name is enabled, false otherwise.
+	 *
+	 * @param {String} name
+	 * @return {Boolean}
+	 * @api public
+	 */
+	
+	function enabled(name) {
+	  var i, len;
+	  for (i = 0, len = exports.skips.length; i < len; i++) {
+	    if (exports.skips[i].test(name)) {
+	      return false;
+	    }
+	  }
+	  for (i = 0, len = exports.names.length; i < len; i++) {
+	    if (exports.names[i].test(name)) {
+	      return true;
+	    }
+	  }
+	  return false;
+	}
+	
+	/**
+	 * Coerce `val`.
+	 *
+	 * @param {Mixed} val
+	 * @return {Mixed}
+	 * @api private
+	 */
+	
+	function coerce(val) {
+	  if (val instanceof Error) return val.stack || val.message;
+	  return val;
+	}
+
+
+/***/ },
+/* 175 */
+/***/ function(module, exports) {
+
+	/**
+	 * Helpers.
+	 */
+	
+	var s = 1000;
+	var m = s * 60;
+	var h = m * 60;
+	var d = h * 24;
+	var y = d * 365.25;
+	
+	/**
+	 * Parse or format the given `val`.
+	 *
+	 * Options:
+	 *
+	 *  - `long` verbose formatting [false]
+	 *
+	 * @param {String|Number} val
+	 * @param {Object} options
+	 * @return {String|Number}
+	 * @api public
+	 */
+	
+	module.exports = function(val, options){
+	  options = options || {};
+	  if ('string' == typeof val) return parse(val);
+	  return options.long
+	    ? long(val)
+	    : short(val);
+	};
+	
+	/**
+	 * Parse the given `str` and return milliseconds.
+	 *
+	 * @param {String} str
+	 * @return {Number}
+	 * @api private
+	 */
+	
+	function parse(str) {
+	  str = '' + str;
+	  if (str.length > 10000) return;
+	  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
+	  if (!match) return;
+	  var n = parseFloat(match[1]);
+	  var type = (match[2] || 'ms').toLowerCase();
+	  switch (type) {
+	    case 'years':
+	    case 'year':
+	    case 'yrs':
+	    case 'yr':
+	    case 'y':
+	      return n * y;
+	    case 'days':
+	    case 'day':
+	    case 'd':
+	      return n * d;
+	    case 'hours':
+	    case 'hour':
+	    case 'hrs':
+	    case 'hr':
+	    case 'h':
+	      return n * h;
+	    case 'minutes':
+	    case 'minute':
+	    case 'mins':
+	    case 'min':
+	    case 'm':
+	      return n * m;
+	    case 'seconds':
+	    case 'second':
+	    case 'secs':
+	    case 'sec':
+	    case 's':
+	      return n * s;
+	    case 'milliseconds':
+	    case 'millisecond':
+	    case 'msecs':
+	    case 'msec':
+	    case 'ms':
+	      return n;
+	  }
+	}
+	
+	/**
+	 * Short format for `ms`.
+	 *
+	 * @param {Number} ms
+	 * @return {String}
+	 * @api private
+	 */
+	
+	function short(ms) {
+	  if (ms >= d) return Math.round(ms / d) + 'd';
+	  if (ms >= h) return Math.round(ms / h) + 'h';
+	  if (ms >= m) return Math.round(ms / m) + 'm';
+	  if (ms >= s) return Math.round(ms / s) + 's';
+	  return ms + 'ms';
+	}
+	
+	/**
+	 * Long format for `ms`.
+	 *
+	 * @param {Number} ms
+	 * @return {String}
+	 * @api private
+	 */
+	
+	function long(ms) {
+	  return plural(ms, d, 'day')
+	    || plural(ms, h, 'hour')
+	    || plural(ms, m, 'minute')
+	    || plural(ms, s, 'second')
+	    || ms + ' ms';
+	}
+	
+	/**
+	 * Pluralization helper.
+	 */
+	
+	function plural(ms, n, name) {
+	  if (ms < n) return;
+	  if (ms < n * 1.5) return Math.floor(ms / n) + ' ' + name;
+	  return Math.ceil(ms / n) + ' ' + name + 's';
+	}
+
+
+/***/ },
+/* 176 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	/**
+	 * Module dependencies.
+	 */
+	
+	var debug = __webpack_require__(173)('socket.io-parser');
+	var json = __webpack_require__(177);
+	var isArray = __webpack_require__(180);
+	var Emitter = __webpack_require__(181);
+	var binary = __webpack_require__(182);
+	var isBuf = __webpack_require__(183);
+	
+	/**
+	 * Protocol version.
+	 *
+	 * @api public
+	 */
+	
+	exports.protocol = 4;
+	
+	/**
+	 * Packet types.
+	 *
+	 * @api public
+	 */
+	
+	exports.types = [
+	  'CONNECT',
+	  'DISCONNECT',
+	  'EVENT',
+	  'ACK',
+	  'ERROR',
+	  'BINARY_EVENT',
+	  'BINARY_ACK'
+	];
+	
+	/**
+	 * Packet type `connect`.
+	 *
+	 * @api public
+	 */
+	
+	exports.CONNECT = 0;
+	
+	/**
+	 * Packet type `disconnect`.
+	 *
+	 * @api public
+	 */
+	
+	exports.DISCONNECT = 1;
+	
+	/**
+	 * Packet type `event`.
+	 *
+	 * @api public
+	 */
+	
+	exports.EVENT = 2;
+	
+	/**
+	 * Packet type `ack`.
+	 *
+	 * @api public
+	 */
+	
+	exports.ACK = 3;
+	
+	/**
+	 * Packet type `error`.
+	 *
+	 * @api public
+	 */
+	
+	exports.ERROR = 4;
+	
+	/**
+	 * Packet type 'binary event'
+	 *
+	 * @api public
+	 */
+	
+	exports.BINARY_EVENT = 5;
+	
+	/**
+	 * Packet type `binary ack`. For acks with binary arguments.
+	 *
+	 * @api public
+	 */
+	
+	exports.BINARY_ACK = 6;
+	
+	/**
+	 * Encoder constructor.
+	 *
+	 * @api public
+	 */
+	
+	exports.Encoder = Encoder;
+	
+	/**
+	 * Decoder constructor.
+	 *
+	 * @api public
+	 */
+	
+	exports.Decoder = Decoder;
+	
+	/**
+	 * A socket.io Encoder instance
+	 *
+	 * @api public
+	 */
+	
+	function Encoder() {}
+	
+	/**
+	 * Encode a packet as a single string if non-binary, or as a
+	 * buffer sequence, depending on packet type.
+	 *
+	 * @param {Object} obj - packet object
+	 * @param {Function} callback - function to handle encodings (likely engine.write)
+	 * @return Calls callback with Array of encodings
+	 * @api public
+	 */
+	
+	Encoder.prototype.encode = function(obj, callback){
+	  debug('encoding packet %j', obj);
+	
+	  if (exports.BINARY_EVENT == obj.type || exports.BINARY_ACK == obj.type) {
+	    encodeAsBinary(obj, callback);
+	  }
+	  else {
+	    var encoding = encodeAsString(obj);
+	    callback([encoding]);
+	  }
+	};
+	
+	/**
+	 * Encode packet as string.
+	 *
+	 * @param {Object} packet
+	 * @return {String} encoded
+	 * @api private
+	 */
+	
+	function encodeAsString(obj) {
+	  var str = '';
+	  var nsp = false;
+	
+	  // first is type
+	  str += obj.type;
+	
+	  // attachments if we have them
+	  if (exports.BINARY_EVENT == obj.type || exports.BINARY_ACK == obj.type) {
+	    str += obj.attachments;
+	    str += '-';
+	  }
+	
+	  // if we have a namespace other than `/`
+	  // we append it followed by a comma `,`
+	  if (obj.nsp && '/' != obj.nsp) {
+	    nsp = true;
+	    str += obj.nsp;
+	  }
+	
+	  // immediately followed by the id
+	  if (null != obj.id) {
+	    if (nsp) {
+	      str += ',';
+	      nsp = false;
+	    }
+	    str += obj.id;
+	  }
+	
+	  // json data
+	  if (null != obj.data) {
+	    if (nsp) str += ',';
+	    str += json.stringify(obj.data);
+	  }
+	
+	  debug('encoded %j as %s', obj, str);
+	  return str;
+	}
+	
+	/**
+	 * Encode packet as 'buffer sequence' by removing blobs, and
+	 * deconstructing packet into object with placeholders and
+	 * a list of buffers.
+	 *
+	 * @param {Object} packet
+	 * @return {Buffer} encoded
+	 * @api private
+	 */
+	
+	function encodeAsBinary(obj, callback) {
+	
+	  function writeEncoding(bloblessData) {
+	    var deconstruction = binary.deconstructPacket(bloblessData);
+	    var pack = encodeAsString(deconstruction.packet);
+	    var buffers = deconstruction.buffers;
+	
+	    buffers.unshift(pack); // add packet info to beginning of data list
+	    callback(buffers); // write all the buffers
+	  }
+	
+	  binary.removeBlobs(obj, writeEncoding);
+	}
+	
+	/**
+	 * A socket.io Decoder instance
+	 *
+	 * @return {Object} decoder
+	 * @api public
+	 */
+	
+	function Decoder() {
+	  this.reconstructor = null;
+	}
+	
+	/**
+	 * Mix in `Emitter` with Decoder.
+	 */
+	
+	Emitter(Decoder.prototype);
+	
+	/**
+	 * Decodes an ecoded packet string into packet JSON.
+	 *
+	 * @param {String} obj - encoded packet
+	 * @return {Object} packet
+	 * @api public
+	 */
+	
+	Decoder.prototype.add = function(obj) {
+	  var packet;
+	  if ('string' == typeof obj) {
+	    packet = decodeString(obj);
+	    if (exports.BINARY_EVENT == packet.type || exports.BINARY_ACK == packet.type) { // binary packet's json
+	      this.reconstructor = new BinaryReconstructor(packet);
+	
+	      // no attachments, labeled binary but no binary data to follow
+	      if (this.reconstructor.reconPack.attachments === 0) {
+	        this.emit('decoded', packet);
+	      }
+	    } else { // non-binary full packet
+	      this.emit('decoded', packet);
+	    }
+	  }
+	  else if (isBuf(obj) || obj.base64) { // raw binary data
+	    if (!this.reconstructor) {
+	      throw new Error('got binary data when not reconstructing a packet');
+	    } else {
+	      packet = this.reconstructor.takeBinaryData(obj);
+	      if (packet) { // received final buffer
+	        this.reconstructor = null;
+	        this.emit('decoded', packet);
+	      }
+	    }
+	  }
+	  else {
+	    throw new Error('Unknown type: ' + obj);
+	  }
+	};
+	
+	/**
+	 * Decode a packet String (JSON data)
+	 *
+	 * @param {String} str
+	 * @return {Object} packet
+	 * @api private
+	 */
+	
+	function decodeString(str) {
+	  var p = {};
+	  var i = 0;
+	
+	  // look up type
+	  p.type = Number(str.charAt(0));
+	  if (null == exports.types[p.type]) return error();
+	
+	  // look up attachments if type binary
+	  if (exports.BINARY_EVENT == p.type || exports.BINARY_ACK == p.type) {
+	    var buf = '';
+	    while (str.charAt(++i) != '-') {
+	      buf += str.charAt(i);
+	      if (i == str.length) break;
+	    }
+	    if (buf != Number(buf) || str.charAt(i) != '-') {
+	      throw new Error('Illegal attachments');
+	    }
+	    p.attachments = Number(buf);
+	  }
+	
+	  // look up namespace (if any)
+	  if ('/' == str.charAt(i + 1)) {
+	    p.nsp = '';
+	    while (++i) {
+	      var c = str.charAt(i);
+	      if (',' == c) break;
+	      p.nsp += c;
+	      if (i == str.length) break;
+	    }
+	  } else {
+	    p.nsp = '/';
+	  }
+	
+	  // look up id
+	  var next = str.charAt(i + 1);
+	  if ('' !== next && Number(next) == next) {
+	    p.id = '';
+	    while (++i) {
+	      var c = str.charAt(i);
+	      if (null == c || Number(c) != c) {
+	        --i;
+	        break;
+	      }
+	      p.id += str.charAt(i);
+	      if (i == str.length) break;
+	    }
+	    p.id = Number(p.id);
+	  }
+	
+	  // look up json data
+	  if (str.charAt(++i)) {
+	    try {
+	      p.data = json.parse(str.substr(i));
+	    } catch(e){
+	      return error();
+	    }
+	  }
+	
+	  debug('decoded %s as %j', str, p);
+	  return p;
+	}
+	
+	/**
+	 * Deallocates a parser's resources
+	 *
+	 * @api public
+	 */
+	
+	Decoder.prototype.destroy = function() {
+	  if (this.reconstructor) {
+	    this.reconstructor.finishedReconstruction();
+	  }
+	};
+	
+	/**
+	 * A manager of a binary event's 'buffer sequence'. Should
+	 * be constructed whenever a packet of type BINARY_EVENT is
+	 * decoded.
+	 *
+	 * @param {Object} packet
+	 * @return {BinaryReconstructor} initialized reconstructor
+	 * @api private
+	 */
+	
+	function BinaryReconstructor(packet) {
+	  this.reconPack = packet;
+	  this.buffers = [];
+	}
+	
+	/**
+	 * Method to be called when binary data received from connection
+	 * after a BINARY_EVENT packet.
+	 *
+	 * @param {Buffer | ArrayBuffer} binData - the raw binary data received
+	 * @return {null | Object} returns null if more binary data is expected or
+	 *   a reconstructed packet object if all buffers have been received.
+	 * @api private
+	 */
+	
+	BinaryReconstructor.prototype.takeBinaryData = function(binData) {
+	  this.buffers.push(binData);
+	  if (this.buffers.length == this.reconPack.attachments) { // done with buffer list
+	    var packet = binary.reconstructPacket(this.reconPack, this.buffers);
+	    this.finishedReconstruction();
+	    return packet;
+	  }
+	  return null;
+	};
+	
+	/**
+	 * Cleans up binary packet reconstruction variables.
+	 *
+	 * @api private
+	 */
+	
+	BinaryReconstructor.prototype.finishedReconstruction = function() {
+	  this.reconPack = null;
+	  this.buffers = [];
+	};
+	
+	function error(data){
+	  return {
+	    type: exports.ERROR,
+	    data: 'parser error'
+	  };
+	}
+
+
+/***/ },
+/* 177 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var __WEBPACK_AMD_DEFINE_RESULT__;/* WEBPACK VAR INJECTION */(function(module, global) {/*! JSON v3.3.2 | http://bestiejs.github.io/json3 | Copyright 2012-2014, Kit Cambridge | http://kit.mit-license.org */
+	;(function () {
+	  // Detect the `define` function exposed by asynchronous module loaders. The
+	  // strict `define` check is necessary for compatibility with `r.js`.
+	  var isLoader = "function" === "function" && __webpack_require__(179);
+	
+	  // A set of types used to distinguish objects from primitives.
+	  var objectTypes = {
+	    "function": true,
+	    "object": true
+	  };
+	
+	  // Detect the `exports` object exposed by CommonJS implementations.
+	  var freeExports = objectTypes[typeof exports] && exports && !exports.nodeType && exports;
+	
+	  // Use the `global` object exposed by Node (including Browserify via
+	  // `insert-module-globals`), Narwhal, and Ringo as the default context,
+	  // and the `window` object in browsers. Rhino exports a `global` function
+	  // instead.
+	  var root = objectTypes[typeof window] && window || this,
+	      freeGlobal = freeExports && objectTypes[typeof module] && module && !module.nodeType && typeof global == "object" && global;
+	
+	  if (freeGlobal && (freeGlobal["global"] === freeGlobal || freeGlobal["window"] === freeGlobal || freeGlobal["self"] === freeGlobal)) {
+	    root = freeGlobal;
+	  }
+	
+	  // Public: Initializes JSON 3 using the given `context` object, attaching the
+	  // `stringify` and `parse` functions to the specified `exports` object.
+	  function runInContext(context, exports) {
+	    context || (context = root["Object"]());
+	    exports || (exports = root["Object"]());
+	
+	    // Native constructor aliases.
+	    var Number = context["Number"] || root["Number"],
+	        String = context["String"] || root["String"],
+	        Object = context["Object"] || root["Object"],
+	        Date = context["Date"] || root["Date"],
+	        SyntaxError = context["SyntaxError"] || root["SyntaxError"],
+	        TypeError = context["TypeError"] || root["TypeError"],
+	        Math = context["Math"] || root["Math"],
+	        nativeJSON = context["JSON"] || root["JSON"];
+	
+	    // Delegate to the native `stringify` and `parse` implementations.
+	    if (typeof nativeJSON == "object" && nativeJSON) {
+	      exports.stringify = nativeJSON.stringify;
+	      exports.parse = nativeJSON.parse;
+	    }
+	
+	    // Convenience aliases.
+	    var objectProto = Object.prototype,
+	        getClass = objectProto.toString,
+	        isProperty, forEach, undef;
+	
+	    // Test the `Date#getUTC*` methods. Based on work by @Yaffle.
+	    var isExtended = new Date(-3509827334573292);
+	    try {
+	      // The `getUTCFullYear`, `Month`, and `Date` methods return nonsensical
+	      // results for certain dates in Opera >= 10.53.
+	      isExtended = isExtended.getUTCFullYear() == -109252 && isExtended.getUTCMonth() === 0 && isExtended.getUTCDate() === 1 &&
+	        // Safari < 2.0.2 stores the internal millisecond time value correctly,
+	        // but clips the values returned by the date methods to the range of
+	        // signed 32-bit integers ([-2 ** 31, 2 ** 31 - 1]).
+	        isExtended.getUTCHours() == 10 && isExtended.getUTCMinutes() == 37 && isExtended.getUTCSeconds() == 6 && isExtended.getUTCMilliseconds() == 708;
+	    } catch (exception) {}
+	
+	    // Internal: Determines whether the native `JSON.stringify` and `parse`
+	    // implementations are spec-compliant. Based on work by Ken Snyder.
+	    function has(name) {
+	      if (has[name] !== undef) {
+	        // Return cached feature test result.
+	        return has[name];
+	      }
+	      var isSupported;
+	      if (name == "bug-string-char-index") {
+	        // IE <= 7 doesn't support accessing string characters using square
+	        // bracket notation. IE 8 only supports this for primitives.
+	        isSupported = "a"[0] != "a";
+	      } else if (name == "json") {
+	        // Indicates whether both `JSON.stringify` and `JSON.parse` are
+	        // supported.
+	        isSupported = has("json-stringify") && has("json-parse");
+	      } else {
+	        var value, serialized = '{"a":[1,true,false,null,"\\u0000\\b\\n\\f\\r\\t"]}';
+	        // Test `JSON.stringify`.
+	        if (name == "json-stringify") {
+	          var stringify = exports.stringify, stringifySupported = typeof stringify == "function" && isExtended;
+	          if (stringifySupported) {
+	            // A test function object with a custom `toJSON` method.
+	            (value = function () {
+	              return 1;
+	            }).toJSON = value;
+	            try {
+	              stringifySupported =
+	                // Firefox 3.1b1 and b2 serialize string, number, and boolean
+	                // primitives as object literals.
+	                stringify(0) === "0" &&
+	                // FF 3.1b1, b2, and JSON 2 serialize wrapped primitives as object
+	                // literals.
+	                stringify(new Number()) === "0" &&
+	                stringify(new String()) == '""' &&
+	                // FF 3.1b1, 2 throw an error if the value is `null`, `undefined`, or
+	                // does not define a canonical JSON representation (this applies to
+	                // objects with `toJSON` properties as well, *unless* they are nested
+	                // within an object or array).
+	                stringify(getClass) === undef &&
+	                // IE 8 serializes `undefined` as `"undefined"`. Safari <= 5.1.7 and
+	                // FF 3.1b3 pass this test.
+	                stringify(undef) === undef &&
+	                // Safari <= 5.1.7 and FF 3.1b3 throw `Error`s and `TypeError`s,
+	                // respectively, if the value is omitted entirely.
+	                stringify() === undef &&
+	                // FF 3.1b1, 2 throw an error if the given value is not a number,
+	                // string, array, object, Boolean, or `null` literal. This applies to
+	                // objects with custom `toJSON` methods as well, unless they are nested
+	                // inside object or array literals. YUI 3.0.0b1 ignores custom `toJSON`
+	                // methods entirely.
+	                stringify(value) === "1" &&
+	                stringify([value]) == "[1]" &&
+	                // Prototype <= 1.6.1 serializes `[undefined]` as `"[]"` instead of
+	                // `"[null]"`.
+	                stringify([undef]) == "[null]" &&
+	                // YUI 3.0.0b1 fails to serialize `null` literals.
+	                stringify(null) == "null" &&
+	                // FF 3.1b1, 2 halts serialization if an array contains a function:
+	                // `[1, true, getClass, 1]` serializes as "[1,true,],". FF 3.1b3
+	                // elides non-JSON values from objects and arrays, unless they
+	                // define custom `toJSON` methods.
+	                stringify([undef, getClass, null]) == "[null,null,null]" &&
+	                // Simple serialization test. FF 3.1b1 uses Unicode escape sequences
+	                // where character escape codes are expected (e.g., `\b` => `\u0008`).
+	                stringify({ "a": [value, true, false, null, "\x00\b\n\f\r\t"] }) == serialized &&
+	                // FF 3.1b1 and b2 ignore the `filter` and `width` arguments.
+	                stringify(null, value) === "1" &&
+	                stringify([1, 2], null, 1) == "[\n 1,\n 2\n]" &&
+	                // JSON 2, Prototype <= 1.7, and older WebKit builds incorrectly
+	                // serialize extended years.
+	                stringify(new Date(-8.64e15)) == '"-271821-04-20T00:00:00.000Z"' &&
+	                // The milliseconds are optional in ES 5, but required in 5.1.
+	                stringify(new Date(8.64e15)) == '"+275760-09-13T00:00:00.000Z"' &&
+	                // Firefox <= 11.0 incorrectly serializes years prior to 0 as negative
+	                // four-digit years instead of six-digit years. Credits: @Yaffle.
+	                stringify(new Date(-621987552e5)) == '"-000001-01-01T00:00:00.000Z"' &&
+	                // Safari <= 5.1.5 and Opera >= 10.53 incorrectly serialize millisecond
+	                // values less than 1000. Credits: @Yaffle.
+	                stringify(new Date(-1)) == '"1969-12-31T23:59:59.999Z"';
+	            } catch (exception) {
+	              stringifySupported = false;
+	            }
+	          }
+	          isSupported = stringifySupported;
+	        }
+	        // Test `JSON.parse`.
+	        if (name == "json-parse") {
+	          var parse = exports.parse;
+	          if (typeof parse == "function") {
+	            try {
+	              // FF 3.1b1, b2 will throw an exception if a bare literal is provided.
+	              // Conforming implementations should also coerce the initial argument to
+	              // a string prior to parsing.
+	              if (parse("0") === 0 && !parse(false)) {
+	                // Simple parsing test.
+	                value = parse(serialized);
+	                var parseSupported = value["a"].length == 5 && value["a"][0] === 1;
+	                if (parseSupported) {
+	                  try {
+	                    // Safari <= 5.1.2 and FF 3.1b1 allow unescaped tabs in strings.
+	                    parseSupported = !parse('"\t"');
+	                  } catch (exception) {}
+	                  if (parseSupported) {
+	                    try {
+	                      // FF 4.0 and 4.0.1 allow leading `+` signs and leading
+	                      // decimal points. FF 4.0, 4.0.1, and IE 9-10 also allow
+	                      // certain octal literals.
+	                      parseSupported = parse("01") !== 1;
+	                    } catch (exception) {}
+	                  }
+	                  if (parseSupported) {
+	                    try {
+	                      // FF 4.0, 4.0.1, and Rhino 1.7R3-R4 allow trailing decimal
+	                      // points. These environments, along with FF 3.1b1 and 2,
+	                      // also allow trailing commas in JSON objects and arrays.
+	                      parseSupported = parse("1.") !== 1;
+	                    } catch (exception) {}
+	                  }
+	                }
+	              }
+	            } catch (exception) {
+	              parseSupported = false;
+	            }
+	          }
+	          isSupported = parseSupported;
+	        }
+	      }
+	      return has[name] = !!isSupported;
+	    }
+	
+	    if (!has("json")) {
+	      // Common `[[Class]]` name aliases.
+	      var functionClass = "[object Function]",
+	          dateClass = "[object Date]",
+	          numberClass = "[object Number]",
+	          stringClass = "[object String]",
+	          arrayClass = "[object Array]",
+	          booleanClass = "[object Boolean]";
+	
+	      // Detect incomplete support for accessing string characters by index.
+	      var charIndexBuggy = has("bug-string-char-index");
+	
+	      // Define additional utility methods if the `Date` methods are buggy.
+	      if (!isExtended) {
+	        var floor = Math.floor;
+	        // A mapping between the months of the year and the number of days between
+	        // January 1st and the first of the respective month.
+	        var Months = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+	        // Internal: Calculates the number of days between the Unix epoch and the
+	        // first day of the given month.
+	        var getDay = function (year, month) {
+	          return Months[month] + 365 * (year - 1970) + floor((year - 1969 + (month = +(month > 1))) / 4) - floor((year - 1901 + month) / 100) + floor((year - 1601 + month) / 400);
+	        };
+	      }
+	
+	      // Internal: Determines if a property is a direct property of the given
+	      // object. Delegates to the native `Object#hasOwnProperty` method.
+	      if (!(isProperty = objectProto.hasOwnProperty)) {
+	        isProperty = function (property) {
+	          var members = {}, constructor;
+	          if ((members.__proto__ = null, members.__proto__ = {
+	            // The *proto* property cannot be set multiple times in recent
+	            // versions of Firefox and SeaMonkey.
+	            "toString": 1
+	          }, members).toString != getClass) {
+	            // Safari <= 2.0.3 doesn't implement `Object#hasOwnProperty`, but
+	            // supports the mutable *proto* property.
+	            isProperty = function (property) {
+	              // Capture and break the object's prototype chain (see section 8.6.2
+	              // of the ES 5.1 spec). The parenthesized expression prevents an
+	              // unsafe transformation by the Closure Compiler.
+	              var original = this.__proto__, result = property in (this.__proto__ = null, this);
+	              // Restore the original prototype chain.
+	              this.__proto__ = original;
+	              return result;
+	            };
+	          } else {
+	            // Capture a reference to the top-level `Object` constructor.
+	            constructor = members.constructor;
+	            // Use the `constructor` property to simulate `Object#hasOwnProperty` in
+	            // other environments.
+	            isProperty = function (property) {
+	              var parent = (this.constructor || constructor).prototype;
+	              return property in this && !(property in parent && this[property] === parent[property]);
+	            };
+	          }
+	          members = null;
+	          return isProperty.call(this, property);
+	        };
+	      }
+	
+	      // Internal: Normalizes the `for...in` iteration algorithm across
+	      // environments. Each enumerated key is yielded to a `callback` function.
+	      forEach = function (object, callback) {
+	        var size = 0, Properties, members, property;
+	
+	        // Tests for bugs in the current environment's `for...in` algorithm. The
+	        // `valueOf` property inherits the non-enumerable flag from
+	        // `Object.prototype` in older versions of IE, Netscape, and Mozilla.
+	        (Properties = function () {
+	          this.valueOf = 0;
+	        }).prototype.valueOf = 0;
+	
+	        // Iterate over a new instance of the `Properties` class.
+	        members = new Properties();
+	        for (property in members) {
+	          // Ignore all properties inherited from `Object.prototype`.
+	          if (isProperty.call(members, property)) {
+	            size++;
+	          }
+	        }
+	        Properties = members = null;
+	
+	        // Normalize the iteration algorithm.
+	        if (!size) {
+	          // A list of non-enumerable properties inherited from `Object.prototype`.
+	          members = ["valueOf", "toString", "toLocaleString", "propertyIsEnumerable", "isPrototypeOf", "hasOwnProperty", "constructor"];
+	          // IE <= 8, Mozilla 1.0, and Netscape 6.2 ignore shadowed non-enumerable
+	          // properties.
+	          forEach = function (object, callback) {
+	            var isFunction = getClass.call(object) == functionClass, property, length;
+	            var hasProperty = !isFunction && typeof object.constructor != "function" && objectTypes[typeof object.hasOwnProperty] && object.hasOwnProperty || isProperty;
+	            for (property in object) {
+	              // Gecko <= 1.0 enumerates the `prototype` property of functions under
+	              // certain conditions; IE does not.
+	              if (!(isFunction && property == "prototype") && hasProperty.call(object, property)) {
+	                callback(property);
+	              }
+	            }
+	            // Manually invoke the callback for each non-enumerable property.
+	            for (length = members.length; property = members[--length]; hasProperty.call(object, property) && callback(property));
+	          };
+	        } else if (size == 2) {
+	          // Safari <= 2.0.4 enumerates shadowed properties twice.
+	          forEach = function (object, callback) {
+	            // Create a set of iterated properties.
+	            var members = {}, isFunction = getClass.call(object) == functionClass, property;
+	            for (property in object) {
+	              // Store each property name to prevent double enumeration. The
+	              // `prototype` property of functions is not enumerated due to cross-
+	              // environment inconsistencies.
+	              if (!(isFunction && property == "prototype") && !isProperty.call(members, property) && (members[property] = 1) && isProperty.call(object, property)) {
+	                callback(property);
+	              }
+	            }
+	          };
+	        } else {
+	          // No bugs detected; use the standard `for...in` algorithm.
+	          forEach = function (object, callback) {
+	            var isFunction = getClass.call(object) == functionClass, property, isConstructor;
+	            for (property in object) {
+	              if (!(isFunction && property == "prototype") && isProperty.call(object, property) && !(isConstructor = property === "constructor")) {
+	                callback(property);
+	              }
+	            }
+	            // Manually invoke the callback for the `constructor` property due to
+	            // cross-environment inconsistencies.
+	            if (isConstructor || isProperty.call(object, (property = "constructor"))) {
+	              callback(property);
+	            }
+	          };
+	        }
+	        return forEach(object, callback);
+	      };
+	
+	      // Public: Serializes a JavaScript `value` as a JSON string. The optional
+	      // `filter` argument may specify either a function that alters how object and
+	      // array members are serialized, or an array of strings and numbers that
+	      // indicates which properties should be serialized. The optional `width`
+	      // argument may be either a string or number that specifies the indentation
+	      // level of the output.
+	      if (!has("json-stringify")) {
+	        // Internal: A map of control characters and their escaped equivalents.
+	        var Escapes = {
+	          92: "\\\\",
+	          34: '\\"',
+	          8: "\\b",
+	          12: "\\f",
+	          10: "\\n",
+	          13: "\\r",
+	          9: "\\t"
+	        };
+	
+	        // Internal: Converts `value` into a zero-padded string such that its
+	        // length is at least equal to `width`. The `width` must be <= 6.
+	        var leadingZeroes = "000000";
+	        var toPaddedString = function (width, value) {
+	          // The `|| 0` expression is necessary to work around a bug in
+	          // Opera <= 7.54u2 where `0 == -0`, but `String(-0) !== "0"`.
+	          return (leadingZeroes + (value || 0)).slice(-width);
+	        };
+	
+	        // Internal: Double-quotes a string `value`, replacing all ASCII control
+	        // characters (characters with code unit values between 0 and 31) with
+	        // their escaped equivalents. This is an implementation of the
+	        // `Quote(value)` operation defined in ES 5.1 section 15.12.3.
+	        var unicodePrefix = "\\u00";
+	        var quote = function (value) {
+	          var result = '"', index = 0, length = value.length, useCharIndex = !charIndexBuggy || length > 10;
+	          var symbols = useCharIndex && (charIndexBuggy ? value.split("") : value);
+	          for (; index < length; index++) {
+	            var charCode = value.charCodeAt(index);
+	            // If the character is a control character, append its Unicode or
+	            // shorthand escape sequence; otherwise, append the character as-is.
+	            switch (charCode) {
+	              case 8: case 9: case 10: case 12: case 13: case 34: case 92:
+	                result += Escapes[charCode];
+	                break;
+	              default:
+	                if (charCode < 32) {
+	                  result += unicodePrefix + toPaddedString(2, charCode.toString(16));
+	                  break;
+	                }
+	                result += useCharIndex ? symbols[index] : value.charAt(index);
+	            }
+	          }
+	          return result + '"';
+	        };
+	
+	        // Internal: Recursively serializes an object. Implements the
+	        // `Str(key, holder)`, `JO(value)`, and `JA(value)` operations.
+	        var serialize = function (property, object, callback, properties, whitespace, indentation, stack) {
+	          var value, className, year, month, date, time, hours, minutes, seconds, milliseconds, results, element, index, length, prefix, result;
+	          try {
+	            // Necessary for host object support.
+	            value = object[property];
+	          } catch (exception) {}
+	          if (typeof value == "object" && value) {
+	            className = getClass.call(value);
+	            if (className == dateClass && !isProperty.call(value, "toJSON")) {
+	              if (value > -1 / 0 && value < 1 / 0) {
+	                // Dates are serialized according to the `Date#toJSON` method
+	                // specified in ES 5.1 section 15.9.5.44. See section 15.9.1.15
+	                // for the ISO 8601 date time string format.
+	                if (getDay) {
+	                  // Manually compute the year, month, date, hours, minutes,
+	                  // seconds, and milliseconds if the `getUTC*` methods are
+	                  // buggy. Adapted from @Yaffle's `date-shim` project.
+	                  date = floor(value / 864e5);
+	                  for (year = floor(date / 365.2425) + 1970 - 1; getDay(year + 1, 0) <= date; year++);
+	                  for (month = floor((date - getDay(year, 0)) / 30.42); getDay(year, month + 1) <= date; month++);
+	                  date = 1 + date - getDay(year, month);
+	                  // The `time` value specifies the time within the day (see ES
+	                  // 5.1 section 15.9.1.2). The formula `(A % B + B) % B` is used
+	                  // to compute `A modulo B`, as the `%` operator does not
+	                  // correspond to the `modulo` operation for negative numbers.
+	                  time = (value % 864e5 + 864e5) % 864e5;
+	                  // The hours, minutes, seconds, and milliseconds are obtained by
+	                  // decomposing the time within the day. See section 15.9.1.10.
+	                  hours = floor(time / 36e5) % 24;
+	                  minutes = floor(time / 6e4) % 60;
+	                  seconds = floor(time / 1e3) % 60;
+	                  milliseconds = time % 1e3;
+	                } else {
+	                  year = value.getUTCFullYear();
+	                  month = value.getUTCMonth();
+	                  date = value.getUTCDate();
+	                  hours = value.getUTCHours();
+	                  minutes = value.getUTCMinutes();
+	                  seconds = value.getUTCSeconds();
+	                  milliseconds = value.getUTCMilliseconds();
+	                }
+	                // Serialize extended years correctly.
+	                value = (year <= 0 || year >= 1e4 ? (year < 0 ? "-" : "+") + toPaddedString(6, year < 0 ? -year : year) : toPaddedString(4, year)) +
+	                  "-" + toPaddedString(2, month + 1) + "-" + toPaddedString(2, date) +
+	                  // Months, dates, hours, minutes, and seconds should have two
+	                  // digits; milliseconds should have three.
+	                  "T" + toPaddedString(2, hours) + ":" + toPaddedString(2, minutes) + ":" + toPaddedString(2, seconds) +
+	                  // Milliseconds are optional in ES 5.0, but required in 5.1.
+	                  "." + toPaddedString(3, milliseconds) + "Z";
+	              } else {
+	                value = null;
+	              }
+	            } else if (typeof value.toJSON == "function" && ((className != numberClass && className != stringClass && className != arrayClass) || isProperty.call(value, "toJSON"))) {
+	              // Prototype <= 1.6.1 adds non-standard `toJSON` methods to the
+	              // `Number`, `String`, `Date`, and `Array` prototypes. JSON 3
+	              // ignores all `toJSON` methods on these objects unless they are
+	              // defined directly on an instance.
+	              value = value.toJSON(property);
+	            }
+	          }
+	          if (callback) {
+	            // If a replacement function was provided, call it to obtain the value
+	            // for serialization.
+	            value = callback.call(object, property, value);
+	          }
+	          if (value === null) {
+	            return "null";
+	          }
+	          className = getClass.call(value);
+	          if (className == booleanClass) {
+	            // Booleans are represented literally.
+	            return "" + value;
+	          } else if (className == numberClass) {
+	            // JSON numbers must be finite. `Infinity` and `NaN` are serialized as
+	            // `"null"`.
+	            return value > -1 / 0 && value < 1 / 0 ? "" + value : "null";
+	          } else if (className == stringClass) {
+	            // Strings are double-quoted and escaped.
+	            return quote("" + value);
+	          }
+	          // Recursively serialize objects and arrays.
+	          if (typeof value == "object") {
+	            // Check for cyclic structures. This is a linear search; performance
+	            // is inversely proportional to the number of unique nested objects.
+	            for (length = stack.length; length--;) {
+	              if (stack[length] === value) {
+	                // Cyclic structures cannot be serialized by `JSON.stringify`.
+	                throw TypeError();
+	              }
+	            }
+	            // Add the object to the stack of traversed objects.
+	            stack.push(value);
+	            results = [];
+	            // Save the current indentation level and indent one additional level.
+	            prefix = indentation;
+	            indentation += whitespace;
+	            if (className == arrayClass) {
+	              // Recursively serialize array elements.
+	              for (index = 0, length = value.length; index < length; index++) {
+	                element = serialize(index, value, callback, properties, whitespace, indentation, stack);
+	                results.push(element === undef ? "null" : element);
+	              }
+	              result = results.length ? (whitespace ? "[\n" + indentation + results.join(",\n" + indentation) + "\n" + prefix + "]" : ("[" + results.join(",") + "]")) : "[]";
+	            } else {
+	              // Recursively serialize object members. Members are selected from
+	              // either a user-specified list of property names, or the object
+	              // itself.
+	              forEach(properties || value, function (property) {
+	                var element = serialize(property, value, callback, properties, whitespace, indentation, stack);
+	                if (element !== undef) {
+	                  // According to ES 5.1 section 15.12.3: "If `gap` {whitespace}
+	                  // is not the empty string, let `member` {quote(property) + ":"}
+	                  // be the concatenation of `member` and the `space` character."
+	                  // The "`space` character" refers to the literal space
+	                  // character, not the `space` {width} argument provided to
+	                  // `JSON.stringify`.
+	                  results.push(quote(property) + ":" + (whitespace ? " " : "") + element);
+	                }
+	              });
+	              result = results.length ? (whitespace ? "{\n" + indentation + results.join(",\n" + indentation) + "\n" + prefix + "}" : ("{" + results.join(",") + "}")) : "{}";
+	            }
+	            // Remove the object from the traversed object stack.
+	            stack.pop();
+	            return result;
+	          }
+	        };
+	
+	        // Public: `JSON.stringify`. See ES 5.1 section 15.12.3.
+	        exports.stringify = function (source, filter, width) {
+	          var whitespace, callback, properties, className;
+	          if (objectTypes[typeof filter] && filter) {
+	            if ((className = getClass.call(filter)) == functionClass) {
+	              callback = filter;
+	            } else if (className == arrayClass) {
+	              // Convert the property names array into a makeshift set.
+	              properties = {};
+	              for (var index = 0, length = filter.length, value; index < length; value = filter[index++], ((className = getClass.call(value)), className == stringClass || className == numberClass) && (properties[value] = 1));
+	            }
+	          }
+	          if (width) {
+	            if ((className = getClass.call(width)) == numberClass) {
+	              // Convert the `width` to an integer and create a string containing
+	              // `width` number of space characters.
+	              if ((width -= width % 1) > 0) {
+	                for (whitespace = "", width > 10 && (width = 10); whitespace.length < width; whitespace += " ");
+	              }
+	            } else if (className == stringClass) {
+	              whitespace = width.length <= 10 ? width : width.slice(0, 10);
+	            }
+	          }
+	          // Opera <= 7.54u2 discards the values associated with empty string keys
+	          // (`""`) only if they are used directly within an object member list
+	          // (e.g., `!("" in { "": 1})`).
+	          return serialize("", (value = {}, value[""] = source, value), callback, properties, whitespace, "", []);
+	        };
+	      }
+	
+	      // Public: Parses a JSON source string.
+	      if (!has("json-parse")) {
+	        var fromCharCode = String.fromCharCode;
+	
+	        // Internal: A map of escaped control characters and their unescaped
+	        // equivalents.
+	        var Unescapes = {
+	          92: "\\",
+	          34: '"',
+	          47: "/",
+	          98: "\b",
+	          116: "\t",
+	          110: "\n",
+	          102: "\f",
+	          114: "\r"
+	        };
+	
+	        // Internal: Stores the parser state.
+	        var Index, Source;
+	
+	        // Internal: Resets the parser state and throws a `SyntaxError`.
+	        var abort = function () {
+	          Index = Source = null;
+	          throw SyntaxError();
+	        };
+	
+	        // Internal: Returns the next token, or `"$"` if the parser has reached
+	        // the end of the source string. A token may be a string, number, `null`
+	        // literal, or Boolean literal.
+	        var lex = function () {
+	          var source = Source, length = source.length, value, begin, position, isSigned, charCode;
+	          while (Index < length) {
+	            charCode = source.charCodeAt(Index);
+	            switch (charCode) {
+	              case 9: case 10: case 13: case 32:
+	                // Skip whitespace tokens, including tabs, carriage returns, line
+	                // feeds, and space characters.
+	                Index++;
+	                break;
+	              case 123: case 125: case 91: case 93: case 58: case 44:
+	                // Parse a punctuator token (`{`, `}`, `[`, `]`, `:`, or `,`) at
+	                // the current position.
+	                value = charIndexBuggy ? source.charAt(Index) : source[Index];
+	                Index++;
+	                return value;
+	              case 34:
+	                // `"` delimits a JSON string; advance to the next character and
+	                // begin parsing the string. String tokens are prefixed with the
+	                // sentinel `@` character to distinguish them from punctuators and
+	                // end-of-string tokens.
+	                for (value = "@", Index++; Index < length;) {
+	                  charCode = source.charCodeAt(Index);
+	                  if (charCode < 32) {
+	                    // Unescaped ASCII control characters (those with a code unit
+	                    // less than the space character) are not permitted.
+	                    abort();
+	                  } else if (charCode == 92) {
+	                    // A reverse solidus (`\`) marks the beginning of an escaped
+	                    // control character (including `"`, `\`, and `/`) or Unicode
+	                    // escape sequence.
+	                    charCode = source.charCodeAt(++Index);
+	                    switch (charCode) {
+	                      case 92: case 34: case 47: case 98: case 116: case 110: case 102: case 114:
+	                        // Revive escaped control characters.
+	                        value += Unescapes[charCode];
+	                        Index++;
+	                        break;
+	                      case 117:
+	                        // `\u` marks the beginning of a Unicode escape sequence.
+	                        // Advance to the first character and validate the
+	                        // four-digit code point.
+	                        begin = ++Index;
+	                        for (position = Index + 4; Index < position; Index++) {
+	                          charCode = source.charCodeAt(Index);
+	                          // A valid sequence comprises four hexdigits (case-
+	                          // insensitive) that form a single hexadecimal value.
+	                          if (!(charCode >= 48 && charCode <= 57 || charCode >= 97 && charCode <= 102 || charCode >= 65 && charCode <= 70)) {
+	                            // Invalid Unicode escape sequence.
+	                            abort();
+	                          }
+	                        }
+	                        // Revive the escaped character.
+	                        value += fromCharCode("0x" + source.slice(begin, Index));
+	                        break;
+	                      default:
+	                        // Invalid escape sequence.
+	                        abort();
+	                    }
+	                  } else {
+	                    if (charCode == 34) {
+	                      // An unescaped double-quote character marks the end of the
+	                      // string.
+	                      break;
+	                    }
+	                    charCode = source.charCodeAt(Index);
+	                    begin = Index;
+	                    // Optimize for the common case where a string is valid.
+	                    while (charCode >= 32 && charCode != 92 && charCode != 34) {
+	                      charCode = source.charCodeAt(++Index);
+	                    }
+	                    // Append the string as-is.
+	                    value += source.slice(begin, Index);
+	                  }
+	                }
+	                if (source.charCodeAt(Index) == 34) {
+	                  // Advance to the next character and return the revived string.
+	                  Index++;
+	                  return value;
+	                }
+	                // Unterminated string.
+	                abort();
+	              default:
+	                // Parse numbers and literals.
+	                begin = Index;
+	                // Advance past the negative sign, if one is specified.
+	                if (charCode == 45) {
+	                  isSigned = true;
+	                  charCode = source.charCodeAt(++Index);
+	                }
+	                // Parse an integer or floating-point value.
+	                if (charCode >= 48 && charCode <= 57) {
+	                  // Leading zeroes are interpreted as octal literals.
+	                  if (charCode == 48 && ((charCode = source.charCodeAt(Index + 1)), charCode >= 48 && charCode <= 57)) {
+	                    // Illegal octal literal.
+	                    abort();
+	                  }
+	                  isSigned = false;
+	                  // Parse the integer component.
+	                  for (; Index < length && ((charCode = source.charCodeAt(Index)), charCode >= 48 && charCode <= 57); Index++);
+	                  // Floats cannot contain a leading decimal point; however, this
+	                  // case is already accounted for by the parser.
+	                  if (source.charCodeAt(Index) == 46) {
+	                    position = ++Index;
+	                    // Parse the decimal component.
+	                    for (; position < length && ((charCode = source.charCodeAt(position)), charCode >= 48 && charCode <= 57); position++);
+	                    if (position == Index) {
+	                      // Illegal trailing decimal.
+	                      abort();
+	                    }
+	                    Index = position;
+	                  }
+	                  // Parse exponents. The `e` denoting the exponent is
+	                  // case-insensitive.
+	                  charCode = source.charCodeAt(Index);
+	                  if (charCode == 101 || charCode == 69) {
+	                    charCode = source.charCodeAt(++Index);
+	                    // Skip past the sign following the exponent, if one is
+	                    // specified.
+	                    if (charCode == 43 || charCode == 45) {
+	                      Index++;
+	                    }
+	                    // Parse the exponential component.
+	                    for (position = Index; position < length && ((charCode = source.charCodeAt(position)), charCode >= 48 && charCode <= 57); position++);
+	                    if (position == Index) {
+	                      // Illegal empty exponent.
+	                      abort();
+	                    }
+	                    Index = position;
+	                  }
+	                  // Coerce the parsed value to a JavaScript number.
+	                  return +source.slice(begin, Index);
+	                }
+	                // A negative sign may only precede numbers.
+	                if (isSigned) {
+	                  abort();
+	                }
+	                // `true`, `false`, and `null` literals.
+	                if (source.slice(Index, Index + 4) == "true") {
+	                  Index += 4;
+	                  return true;
+	                } else if (source.slice(Index, Index + 5) == "false") {
+	                  Index += 5;
+	                  return false;
+	                } else if (source.slice(Index, Index + 4) == "null") {
+	                  Index += 4;
+	                  return null;
+	                }
+	                // Unrecognized token.
+	                abort();
+	            }
+	          }
+	          // Return the sentinel `$` character if the parser has reached the end
+	          // of the source string.
+	          return "$";
+	        };
+	
+	        // Internal: Parses a JSON `value` token.
+	        var get = function (value) {
+	          var results, hasMembers;
+	          if (value == "$") {
+	            // Unexpected end of input.
+	            abort();
+	          }
+	          if (typeof value == "string") {
+	            if ((charIndexBuggy ? value.charAt(0) : value[0]) == "@") {
+	              // Remove the sentinel `@` character.
+	              return value.slice(1);
+	            }
+	            // Parse object and array literals.
+	            if (value == "[") {
+	              // Parses a JSON array, returning a new JavaScript array.
+	              results = [];
+	              for (;; hasMembers || (hasMembers = true)) {
+	                value = lex();
+	                // A closing square bracket marks the end of the array literal.
+	                if (value == "]") {
+	                  break;
+	                }
+	                // If the array literal contains elements, the current token
+	                // should be a comma separating the previous element from the
+	                // next.
+	                if (hasMembers) {
+	                  if (value == ",") {
+	                    value = lex();
+	                    if (value == "]") {
+	                      // Unexpected trailing `,` in array literal.
+	                      abort();
+	                    }
+	                  } else {
+	                    // A `,` must separate each array element.
+	                    abort();
+	                  }
+	                }
+	                // Elisions and leading commas are not permitted.
+	                if (value == ",") {
+	                  abort();
+	                }
+	                results.push(get(value));
+	              }
+	              return results;
+	            } else if (value == "{") {
+	              // Parses a JSON object, returning a new JavaScript object.
+	              results = {};
+	              for (;; hasMembers || (hasMembers = true)) {
+	                value = lex();
+	                // A closing curly brace marks the end of the object literal.
+	                if (value == "}") {
+	                  break;
+	                }
+	                // If the object literal contains members, the current token
+	                // should be a comma separator.
+	                if (hasMembers) {
+	                  if (value == ",") {
+	                    value = lex();
+	                    if (value == "}") {
+	                      // Unexpected trailing `,` in object literal.
+	                      abort();
+	                    }
+	                  } else {
+	                    // A `,` must separate each object member.
+	                    abort();
+	                  }
+	                }
+	                // Leading commas are not permitted, object property names must be
+	                // double-quoted strings, and a `:` must separate each property
+	                // name and value.
+	                if (value == "," || typeof value != "string" || (charIndexBuggy ? value.charAt(0) : value[0]) != "@" || lex() != ":") {
+	                  abort();
+	                }
+	                results[value.slice(1)] = get(lex());
+	              }
+	              return results;
+	            }
+	            // Unexpected token encountered.
+	            abort();
+	          }
+	          return value;
+	        };
+	
+	        // Internal: Updates a traversed object member.
+	        var update = function (source, property, callback) {
+	          var element = walk(source, property, callback);
+	          if (element === undef) {
+	            delete source[property];
+	          } else {
+	            source[property] = element;
+	          }
+	        };
+	
+	        // Internal: Recursively traverses a parsed JSON object, invoking the
+	        // `callback` function for each value. This is an implementation of the
+	        // `Walk(holder, name)` operation defined in ES 5.1 section 15.12.2.
+	        var walk = function (source, property, callback) {
+	          var value = source[property], length;
+	          if (typeof value == "object" && value) {
+	            // `forEach` can't be used to traverse an array in Opera <= 8.54
+	            // because its `Object#hasOwnProperty` implementation returns `false`
+	            // for array indices (e.g., `![1, 2, 3].hasOwnProperty("0")`).
+	            if (getClass.call(value) == arrayClass) {
+	              for (length = value.length; length--;) {
+	                update(value, length, callback);
+	              }
+	            } else {
+	              forEach(value, function (property) {
+	                update(value, property, callback);
+	              });
+	            }
+	          }
+	          return callback.call(source, property, value);
+	        };
+	
+	        // Public: `JSON.parse`. See ES 5.1 section 15.12.2.
+	        exports.parse = function (source, callback) {
+	          var result, value;
+	          Index = 0;
+	          Source = "" + source;
+	          result = get(lex());
+	          // If a JSON string contains multiple tokens, it is invalid.
+	          if (lex() != "$") {
+	            abort();
+	          }
+	          // Reset the parser state.
+	          Index = Source = null;
+	          return callback && getClass.call(callback) == functionClass ? walk((value = {}, value[""] = result, value), "", callback) : result;
+	        };
+	      }
+	    }
+	
+	    exports["runInContext"] = runInContext;
+	    return exports;
+	  }
+	
+	  if (freeExports && !isLoader) {
+	    // Export for CommonJS environments.
+	    runInContext(root, freeExports);
+	  } else {
+	    // Export for web browsers and JavaScript engines.
+	    var nativeJSON = root.JSON,
+	        previousJSON = root["JSON3"],
+	        isRestored = false;
+	
+	    var JSON3 = runInContext(root, (root["JSON3"] = {
+	      // Public: Restores the original value of the global `JSON` object and
+	      // returns a reference to the `JSON3` object.
+	      "noConflict": function () {
+	        if (!isRestored) {
+	          isRestored = true;
+	          root.JSON = nativeJSON;
+	          root["JSON3"] = previousJSON;
+	          nativeJSON = previousJSON = null;
+	        }
+	        return JSON3;
+	      }
+	    }));
+	
+	    root.JSON = {
+	      "parse": JSON3.parse,
+	      "stringify": JSON3.stringify
+	    };
+	  }
+	
+	  // Export for asynchronous module loaders.
+	  if (isLoader) {
+	    !(__WEBPACK_AMD_DEFINE_RESULT__ = function () {
+	      return JSON3;
+	    }.call(exports, __webpack_require__, exports, module), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+	  }
+	}).call(this);
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(178)(module), (function() { return this; }())))
+
+/***/ },
+/* 178 */
+/***/ function(module, exports) {
+
+	module.exports = function(module) {
+		if(!module.webpackPolyfill) {
+			module.deprecate = function() {};
+			module.paths = [];
+			// module.parent = undefined by default
+			module.children = [];
+			module.webpackPolyfill = 1;
+		}
+		return module;
+	}
+
+
+/***/ },
+/* 179 */
+/***/ function(module, exports) {
+
+	/* WEBPACK VAR INJECTION */(function(__webpack_amd_options__) {module.exports = __webpack_amd_options__;
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, {}))
+
+/***/ },
+/* 180 */
+/***/ function(module, exports) {
+
+	module.exports = Array.isArray || function (arr) {
+	  return Object.prototype.toString.call(arr) == '[object Array]';
+	};
+
+
+/***/ },
+/* 181 */
+/***/ function(module, exports) {
+
+	
+	/**
+	 * Expose `Emitter`.
+	 */
+	
+	module.exports = Emitter;
+	
+	/**
+	 * Initialize a new `Emitter`.
+	 *
+	 * @api public
+	 */
+	
+	function Emitter(obj) {
+	  if (obj) return mixin(obj);
+	};
+	
+	/**
+	 * Mixin the emitter properties.
+	 *
+	 * @param {Object} obj
+	 * @return {Object}
+	 * @api private
+	 */
+	
+	function mixin(obj) {
+	  for (var key in Emitter.prototype) {
+	    obj[key] = Emitter.prototype[key];
+	  }
+	  return obj;
+	}
+	
+	/**
+	 * Listen on the given `event` with `fn`.
+	 *
+	 * @param {String} event
+	 * @param {Function} fn
+	 * @return {Emitter}
+	 * @api public
+	 */
+	
+	Emitter.prototype.on =
+	Emitter.prototype.addEventListener = function(event, fn){
+	  this._callbacks = this._callbacks || {};
+	  (this._callbacks[event] = this._callbacks[event] || [])
+	    .push(fn);
+	  return this;
+	};
+	
+	/**
+	 * Adds an `event` listener that will be invoked a single
+	 * time then automatically removed.
+	 *
+	 * @param {String} event
+	 * @param {Function} fn
+	 * @return {Emitter}
+	 * @api public
+	 */
+	
+	Emitter.prototype.once = function(event, fn){
+	  var self = this;
+	  this._callbacks = this._callbacks || {};
+	
+	  function on() {
+	    self.off(event, on);
+	    fn.apply(this, arguments);
+	  }
+	
+	  on.fn = fn;
+	  this.on(event, on);
+	  return this;
+	};
+	
+	/**
+	 * Remove the given callback for `event` or all
+	 * registered callbacks.
+	 *
+	 * @param {String} event
+	 * @param {Function} fn
+	 * @return {Emitter}
+	 * @api public
+	 */
+	
+	Emitter.prototype.off =
+	Emitter.prototype.removeListener =
+	Emitter.prototype.removeAllListeners =
+	Emitter.prototype.removeEventListener = function(event, fn){
+	  this._callbacks = this._callbacks || {};
+	
+	  // all
+	  if (0 == arguments.length) {
+	    this._callbacks = {};
+	    return this;
+	  }
+	
+	  // specific event
+	  var callbacks = this._callbacks[event];
+	  if (!callbacks) return this;
+	
+	  // remove all handlers
+	  if (1 == arguments.length) {
+	    delete this._callbacks[event];
+	    return this;
+	  }
+	
+	  // remove specific handler
+	  var cb;
+	  for (var i = 0; i < callbacks.length; i++) {
+	    cb = callbacks[i];
+	    if (cb === fn || cb.fn === fn) {
+	      callbacks.splice(i, 1);
+	      break;
+	    }
+	  }
+	  return this;
+	};
+	
+	/**
+	 * Emit `event` with the given args.
+	 *
+	 * @param {String} event
+	 * @param {Mixed} ...
+	 * @return {Emitter}
+	 */
+	
+	Emitter.prototype.emit = function(event){
+	  this._callbacks = this._callbacks || {};
+	  var args = [].slice.call(arguments, 1)
+	    , callbacks = this._callbacks[event];
+	
+	  if (callbacks) {
+	    callbacks = callbacks.slice(0);
+	    for (var i = 0, len = callbacks.length; i < len; ++i) {
+	      callbacks[i].apply(this, args);
+	    }
+	  }
+	
+	  return this;
+	};
+	
+	/**
+	 * Return array of callbacks for `event`.
+	 *
+	 * @param {String} event
+	 * @return {Array}
+	 * @api public
+	 */
+	
+	Emitter.prototype.listeners = function(event){
+	  this._callbacks = this._callbacks || {};
+	  return this._callbacks[event] || [];
+	};
+	
+	/**
+	 * Check if this emitter has `event` handlers.
+	 *
+	 * @param {String} event
+	 * @return {Boolean}
+	 * @api public
+	 */
+	
+	Emitter.prototype.hasListeners = function(event){
+	  return !! this.listeners(event).length;
+	};
+
+
+/***/ },
+/* 182 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/*global Blob,File*/
+	
+	/**
+	 * Module requirements
+	 */
+	
+	var isArray = __webpack_require__(180);
+	var isBuf = __webpack_require__(183);
+	
+	/**
+	 * Replaces every Buffer | ArrayBuffer in packet with a numbered placeholder.
+	 * Anything with blobs or files should be fed through removeBlobs before coming
+	 * here.
+	 *
+	 * @param {Object} packet - socket.io event packet
+	 * @return {Object} with deconstructed packet and list of buffers
+	 * @api public
+	 */
+	
+	exports.deconstructPacket = function(packet){
+	  var buffers = [];
+	  var packetData = packet.data;
+	
+	  function _deconstructPacket(data) {
+	    if (!data) return data;
+	
+	    if (isBuf(data)) {
+	      var placeholder = { _placeholder: true, num: buffers.length };
+	      buffers.push(data);
+	      return placeholder;
+	    } else if (isArray(data)) {
+	      var newData = new Array(data.length);
+	      for (var i = 0; i < data.length; i++) {
+	        newData[i] = _deconstructPacket(data[i]);
+	      }
+	      return newData;
+	    } else if ('object' == typeof data && !(data instanceof Date)) {
+	      var newData = {};
+	      for (var key in data) {
+	        newData[key] = _deconstructPacket(data[key]);
+	      }
+	      return newData;
+	    }
+	    return data;
+	  }
+	
+	  var pack = packet;
+	  pack.data = _deconstructPacket(packetData);
+	  pack.attachments = buffers.length; // number of binary 'attachments'
+	  return {packet: pack, buffers: buffers};
+	};
+	
+	/**
+	 * Reconstructs a binary packet from its placeholder packet and buffers
+	 *
+	 * @param {Object} packet - event packet with placeholders
+	 * @param {Array} buffers - binary buffers to put in placeholder positions
+	 * @return {Object} reconstructed packet
+	 * @api public
+	 */
+	
+	exports.reconstructPacket = function(packet, buffers) {
+	  var curPlaceHolder = 0;
+	
+	  function _reconstructPacket(data) {
+	    if (data && data._placeholder) {
+	      var buf = buffers[data.num]; // appropriate buffer (should be natural order anyway)
+	      return buf;
+	    } else if (isArray(data)) {
+	      for (var i = 0; i < data.length; i++) {
+	        data[i] = _reconstructPacket(data[i]);
+	      }
+	      return data;
+	    } else if (data && 'object' == typeof data) {
+	      for (var key in data) {
+	        data[key] = _reconstructPacket(data[key]);
+	      }
+	      return data;
+	    }
+	    return data;
+	  }
+	
+	  packet.data = _reconstructPacket(packet.data);
+	  packet.attachments = undefined; // no longer useful
+	  return packet;
+	};
+	
+	/**
+	 * Asynchronously removes Blobs or Files from data via
+	 * FileReader's readAsArrayBuffer method. Used before encoding
+	 * data as msgpack. Calls callback with the blobless data.
+	 *
+	 * @param {Object} data
+	 * @param {Function} callback
+	 * @api private
+	 */
+	
+	exports.removeBlobs = function(data, callback) {
+	  function _removeBlobs(obj, curKey, containingObject) {
+	    if (!obj) return obj;
+	
+	    // convert any blob
+	    if ((global.Blob && obj instanceof Blob) ||
+	        (global.File && obj instanceof File)) {
+	      pendingBlobs++;
+	
+	      // async filereader
+	      var fileReader = new FileReader();
+	      fileReader.onload = function() { // this.result == arraybuffer
+	        if (containingObject) {
+	          containingObject[curKey] = this.result;
+	        }
+	        else {
+	          bloblessData = this.result;
+	        }
+	
+	        // if nothing pending its callback time
+	        if(! --pendingBlobs) {
+	          callback(bloblessData);
+	        }
+	      };
+	
+	      fileReader.readAsArrayBuffer(obj); // blob -> arraybuffer
+	    } else if (isArray(obj)) { // handle array
+	      for (var i = 0; i < obj.length; i++) {
+	        _removeBlobs(obj[i], i, obj);
+	      }
+	    } else if (obj && 'object' == typeof obj && !isBuf(obj)) { // and object
+	      for (var key in obj) {
+	        _removeBlobs(obj[key], key, obj);
+	      }
+	    }
+	  }
+	
+	  var pendingBlobs = 0;
+	  var bloblessData = data;
+	  _removeBlobs(bloblessData);
+	  if (!pendingBlobs) {
+	    callback(bloblessData);
+	  }
+	};
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 183 */
+/***/ function(module, exports) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {
+	module.exports = isBuf;
+	
+	/**
+	 * Returns true if obj is a buffer or an arraybuffer.
+	 *
+	 * @api private
+	 */
+	
+	function isBuf(obj) {
+	  return (global.Buffer && global.Buffer.isBuffer(obj)) ||
+	         (global.ArrayBuffer && obj instanceof ArrayBuffer);
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 184 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	/**
+	 * Module dependencies.
+	 */
+	
+	var eio = __webpack_require__(185);
+	var Socket = __webpack_require__(211);
+	var Emitter = __webpack_require__(212);
+	var parser = __webpack_require__(176);
+	var on = __webpack_require__(214);
+	var bind = __webpack_require__(215);
+	var debug = __webpack_require__(173)('socket.io-client:manager');
+	var indexOf = __webpack_require__(209);
+	var Backoff = __webpack_require__(218);
+	
+	/**
+	 * IE6+ hasOwnProperty
+	 */
+	
+	var has = Object.prototype.hasOwnProperty;
+	
+	/**
+	 * Module exports
+	 */
+	
+	module.exports = Manager;
+	
+	/**
+	 * `Manager` constructor.
+	 *
+	 * @param {String} engine instance or engine uri/opts
+	 * @param {Object} options
+	 * @api public
+	 */
+	
+	function Manager(uri, opts){
+	  if (!(this instanceof Manager)) return new Manager(uri, opts);
+	  if (uri && ('object' == typeof uri)) {
+	    opts = uri;
+	    uri = undefined;
+	  }
+	  opts = opts || {};
+	
+	  opts.path = opts.path || '/socket.io';
+	  this.nsps = {};
+	  this.subs = [];
+	  this.opts = opts;
+	  this.reconnection(opts.reconnection !== false);
+	  this.reconnectionAttempts(opts.reconnectionAttempts || Infinity);
+	  this.reconnectionDelay(opts.reconnectionDelay || 1000);
+	  this.reconnectionDelayMax(opts.reconnectionDelayMax || 5000);
+	  this.randomizationFactor(opts.randomizationFactor || 0.5);
+	  this.backoff = new Backoff({
+	    min: this.reconnectionDelay(),
+	    max: this.reconnectionDelayMax(),
+	    jitter: this.randomizationFactor()
+	  });
+	  this.timeout(null == opts.timeout ? 20000 : opts.timeout);
+	  this.readyState = 'closed';
+	  this.uri = uri;
+	  this.connecting = [];
+	  this.lastPing = null;
+	  this.encoding = false;
+	  this.packetBuffer = [];
+	  this.encoder = new parser.Encoder();
+	  this.decoder = new parser.Decoder();
+	  this.autoConnect = opts.autoConnect !== false;
+	  if (this.autoConnect) this.open();
+	}
+	
+	/**
+	 * Propagate given event to sockets and emit on `this`
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.emitAll = function() {
+	  this.emit.apply(this, arguments);
+	  for (var nsp in this.nsps) {
+	    if (has.call(this.nsps, nsp)) {
+	      this.nsps[nsp].emit.apply(this.nsps[nsp], arguments);
+	    }
+	  }
+	};
+	
+	/**
+	 * Update `socket.id` of all sockets
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.updateSocketIds = function(){
+	  for (var nsp in this.nsps) {
+	    if (has.call(this.nsps, nsp)) {
+	      this.nsps[nsp].id = this.engine.id;
+	    }
+	  }
+	};
+	
+	/**
+	 * Mix in `Emitter`.
+	 */
+	
+	Emitter(Manager.prototype);
+	
+	/**
+	 * Sets the `reconnection` config.
+	 *
+	 * @param {Boolean} true/false if it should automatically reconnect
+	 * @return {Manager} self or value
+	 * @api public
+	 */
+	
+	Manager.prototype.reconnection = function(v){
+	  if (!arguments.length) return this._reconnection;
+	  this._reconnection = !!v;
+	  return this;
+	};
+	
+	/**
+	 * Sets the reconnection attempts config.
+	 *
+	 * @param {Number} max reconnection attempts before giving up
+	 * @return {Manager} self or value
+	 * @api public
+	 */
+	
+	Manager.prototype.reconnectionAttempts = function(v){
+	  if (!arguments.length) return this._reconnectionAttempts;
+	  this._reconnectionAttempts = v;
+	  return this;
+	};
+	
+	/**
+	 * Sets the delay between reconnections.
+	 *
+	 * @param {Number} delay
+	 * @return {Manager} self or value
+	 * @api public
+	 */
+	
+	Manager.prototype.reconnectionDelay = function(v){
+	  if (!arguments.length) return this._reconnectionDelay;
+	  this._reconnectionDelay = v;
+	  this.backoff && this.backoff.setMin(v);
+	  return this;
+	};
+	
+	Manager.prototype.randomizationFactor = function(v){
+	  if (!arguments.length) return this._randomizationFactor;
+	  this._randomizationFactor = v;
+	  this.backoff && this.backoff.setJitter(v);
+	  return this;
+	};
+	
+	/**
+	 * Sets the maximum delay between reconnections.
+	 *
+	 * @param {Number} delay
+	 * @return {Manager} self or value
+	 * @api public
+	 */
+	
+	Manager.prototype.reconnectionDelayMax = function(v){
+	  if (!arguments.length) return this._reconnectionDelayMax;
+	  this._reconnectionDelayMax = v;
+	  this.backoff && this.backoff.setMax(v);
+	  return this;
+	};
+	
+	/**
+	 * Sets the connection timeout. `false` to disable
+	 *
+	 * @return {Manager} self or value
+	 * @api public
+	 */
+	
+	Manager.prototype.timeout = function(v){
+	  if (!arguments.length) return this._timeout;
+	  this._timeout = v;
+	  return this;
+	};
+	
+	/**
+	 * Starts trying to reconnect if reconnection is enabled and we have not
+	 * started reconnecting yet
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.maybeReconnectOnOpen = function() {
+	  // Only try to reconnect if it's the first time we're connecting
+	  if (!this.reconnecting && this._reconnection && this.backoff.attempts === 0) {
+	    // keeps reconnection from firing twice for the same reconnection loop
+	    this.reconnect();
+	  }
+	};
+	
+	
+	/**
+	 * Sets the current transport `socket`.
+	 *
+	 * @param {Function} optional, callback
+	 * @return {Manager} self
+	 * @api public
+	 */
+	
+	Manager.prototype.open =
+	Manager.prototype.connect = function(fn){
+	  debug('readyState %s', this.readyState);
+	  if (~this.readyState.indexOf('open')) return this;
+	
+	  debug('opening %s', this.uri);
+	  this.engine = eio(this.uri, this.opts);
+	  var socket = this.engine;
+	  var self = this;
+	  this.readyState = 'opening';
+	  this.skipReconnect = false;
+	
+	  // emit `open`
+	  var openSub = on(socket, 'open', function() {
+	    self.onopen();
+	    fn && fn();
+	  });
+	
+	  // emit `connect_error`
+	  var errorSub = on(socket, 'error', function(data){
+	    debug('connect_error');
+	    self.cleanup();
+	    self.readyState = 'closed';
+	    self.emitAll('connect_error', data);
+	    if (fn) {
+	      var err = new Error('Connection error');
+	      err.data = data;
+	      fn(err);
+	    } else {
+	      // Only do this if there is no fn to handle the error
+	      self.maybeReconnectOnOpen();
+	    }
+	  });
+	
+	  // emit `connect_timeout`
+	  if (false !== this._timeout) {
+	    var timeout = this._timeout;
+	    debug('connect attempt will timeout after %d', timeout);
+	
+	    // set timer
+	    var timer = setTimeout(function(){
+	      debug('connect attempt timed out after %d', timeout);
+	      openSub.destroy();
+	      socket.close();
+	      socket.emit('error', 'timeout');
+	      self.emitAll('connect_timeout', timeout);
+	    }, timeout);
+	
+	    this.subs.push({
+	      destroy: function(){
+	        clearTimeout(timer);
+	      }
+	    });
+	  }
+	
+	  this.subs.push(openSub);
+	  this.subs.push(errorSub);
+	
+	  return this;
+	};
+	
+	/**
+	 * Called upon transport open.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.onopen = function(){
+	  debug('open');
+	
+	  // clear old subs
+	  this.cleanup();
+	
+	  // mark as open
+	  this.readyState = 'open';
+	  this.emit('open');
+	
+	  // add new subs
+	  var socket = this.engine;
+	  this.subs.push(on(socket, 'data', bind(this, 'ondata')));
+	  this.subs.push(on(socket, 'ping', bind(this, 'onping')));
+	  this.subs.push(on(socket, 'pong', bind(this, 'onpong')));
+	  this.subs.push(on(socket, 'error', bind(this, 'onerror')));
+	  this.subs.push(on(socket, 'close', bind(this, 'onclose')));
+	  this.subs.push(on(this.decoder, 'decoded', bind(this, 'ondecoded')));
+	};
+	
+	/**
+	 * Called upon a ping.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.onping = function(){
+	  this.lastPing = new Date;
+	  this.emitAll('ping');
+	};
+	
+	/**
+	 * Called upon a packet.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.onpong = function(){
+	  this.emitAll('pong', new Date - this.lastPing);
+	};
+	
+	/**
+	 * Called with data.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.ondata = function(data){
+	  this.decoder.add(data);
+	};
+	
+	/**
+	 * Called when parser fully decodes a packet.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.ondecoded = function(packet) {
+	  this.emit('packet', packet);
+	};
+	
+	/**
+	 * Called upon socket error.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.onerror = function(err){
+	  debug('error', err);
+	  this.emitAll('error', err);
+	};
+	
+	/**
+	 * Creates a new socket for the given `nsp`.
+	 *
+	 * @return {Socket}
+	 * @api public
+	 */
+	
+	Manager.prototype.socket = function(nsp){
+	  var socket = this.nsps[nsp];
+	  if (!socket) {
+	    socket = new Socket(this, nsp);
+	    this.nsps[nsp] = socket;
+	    var self = this;
+	    socket.on('connecting', onConnecting);
+	    socket.on('connect', function(){
+	      socket.id = self.engine.id;
+	    });
+	
+	    if (this.autoConnect) {
+	      // manually call here since connecting evnet is fired before listening
+	      onConnecting();
+	    }
+	  }
+	
+	  function onConnecting() {
+	    if (!~indexOf(self.connecting, socket)) {
+	      self.connecting.push(socket);
+	    }
+	  }
+	
+	  return socket;
+	};
+	
+	/**
+	 * Called upon a socket close.
+	 *
+	 * @param {Socket} socket
+	 */
+	
+	Manager.prototype.destroy = function(socket){
+	  var index = indexOf(this.connecting, socket);
+	  if (~index) this.connecting.splice(index, 1);
+	  if (this.connecting.length) return;
+	
+	  this.close();
+	};
+	
+	/**
+	 * Writes a packet.
+	 *
+	 * @param {Object} packet
+	 * @api private
+	 */
+	
+	Manager.prototype.packet = function(packet){
+	  debug('writing packet %j', packet);
+	  var self = this;
+	
+	  if (!self.encoding) {
+	    // encode, then write to engine with result
+	    self.encoding = true;
+	    this.encoder.encode(packet, function(encodedPackets) {
+	      for (var i = 0; i < encodedPackets.length; i++) {
+	        self.engine.write(encodedPackets[i], packet.options);
+	      }
+	      self.encoding = false;
+	      self.processPacketQueue();
+	    });
+	  } else { // add packet to the queue
+	    self.packetBuffer.push(packet);
+	  }
+	};
+	
+	/**
+	 * If packet buffer is non-empty, begins encoding the
+	 * next packet in line.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.processPacketQueue = function() {
+	  if (this.packetBuffer.length > 0 && !this.encoding) {
+	    var pack = this.packetBuffer.shift();
+	    this.packet(pack);
+	  }
+	};
+	
+	/**
+	 * Clean up transport subscriptions and packet buffer.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.cleanup = function(){
+	  debug('cleanup');
+	
+	  var sub;
+	  while (sub = this.subs.shift()) sub.destroy();
+	
+	  this.packetBuffer = [];
+	  this.encoding = false;
+	  this.lastPing = null;
+	
+	  this.decoder.destroy();
+	};
+	
+	/**
+	 * Close the current socket.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.close =
+	Manager.prototype.disconnect = function(){
+	  debug('disconnect');
+	  this.skipReconnect = true;
+	  this.reconnecting = false;
+	  if ('opening' == this.readyState) {
+	    // `onclose` will not fire because
+	    // an open event never happened
+	    this.cleanup();
+	  }
+	  this.backoff.reset();
+	  this.readyState = 'closed';
+	  if (this.engine) this.engine.close();
+	};
+	
+	/**
+	 * Called upon engine close.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.onclose = function(reason){
+	  debug('onclose');
+	
+	  this.cleanup();
+	  this.backoff.reset();
+	  this.readyState = 'closed';
+	  this.emit('close', reason);
+	
+	  if (this._reconnection && !this.skipReconnect) {
+	    this.reconnect();
+	  }
+	};
+	
+	/**
+	 * Attempt a reconnection.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.reconnect = function(){
+	  if (this.reconnecting || this.skipReconnect) return this;
+	
+	  var self = this;
+	
+	  if (this.backoff.attempts >= this._reconnectionAttempts) {
+	    debug('reconnect failed');
+	    this.backoff.reset();
+	    this.emitAll('reconnect_failed');
+	    this.reconnecting = false;
+	  } else {
+	    var delay = this.backoff.duration();
+	    debug('will wait %dms before reconnect attempt', delay);
+	
+	    this.reconnecting = true;
+	    var timer = setTimeout(function(){
+	      if (self.skipReconnect) return;
+	
+	      debug('attempting reconnect');
+	      self.emitAll('reconnect_attempt', self.backoff.attempts);
+	      self.emitAll('reconnecting', self.backoff.attempts);
+	
+	      // check again for the case socket closed in above events
+	      if (self.skipReconnect) return;
+	
+	      self.open(function(err){
+	        if (err) {
+	          debug('reconnect attempt error');
+	          self.reconnecting = false;
+	          self.reconnect();
+	          self.emitAll('reconnect_error', err.data);
+	        } else {
+	          debug('reconnect success');
+	          self.onreconnect();
+	        }
+	      });
+	    }, delay);
+	
+	    this.subs.push({
+	      destroy: function(){
+	        clearTimeout(timer);
+	      }
+	    });
+	  }
+	};
+	
+	/**
+	 * Called upon successful reconnect.
+	 *
+	 * @api private
+	 */
+	
+	Manager.prototype.onreconnect = function(){
+	  var attempt = this.backoff.attempts;
+	  this.reconnecting = false;
+	  this.backoff.reset();
+	  this.updateSocketIds();
+	  this.emitAll('reconnect', attempt);
+	};
+
+
+/***/ },
+/* 185 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	module.exports =  __webpack_require__(186);
+
+
+/***/ },
+/* 186 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	module.exports = __webpack_require__(187);
+	
+	/**
+	 * Exports parser
+	 *
+	 * @api public
+	 *
+	 */
+	module.exports.parser = __webpack_require__(194);
+
+
+/***/ },
+/* 187 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Module dependencies.
+	 */
+	
+	var transports = __webpack_require__(188);
+	var Emitter = __webpack_require__(181);
+	var debug = __webpack_require__(173)('engine.io-client:socket');
+	var index = __webpack_require__(209);
+	var parser = __webpack_require__(194);
+	var parseuri = __webpack_require__(172);
+	var parsejson = __webpack_require__(210);
+	var parseqs = __webpack_require__(203);
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = Socket;
+	
+	/**
+	 * Noop function.
+	 *
+	 * @api private
+	 */
+	
+	function noop(){}
+	
+	/**
+	 * Socket constructor.
+	 *
+	 * @param {String|Object} uri or options
+	 * @param {Object} options
+	 * @api public
+	 */
+	
+	function Socket(uri, opts){
+	  if (!(this instanceof Socket)) return new Socket(uri, opts);
+	
+	  opts = opts || {};
+	
+	  if (uri && 'object' == typeof uri) {
+	    opts = uri;
+	    uri = null;
+	  }
+	
+	  if (uri) {
+	    uri = parseuri(uri);
+	    opts.hostname = uri.host;
+	    opts.secure = uri.protocol == 'https' || uri.protocol == 'wss';
+	    opts.port = uri.port;
+	    if (uri.query) opts.query = uri.query;
+	  } else if (opts.host) {
+	    opts.hostname = parseuri(opts.host).host;
+	  }
+	
+	  this.secure = null != opts.secure ? opts.secure :
+	    (global.location && 'https:' == location.protocol);
+	
+	  if (opts.hostname && !opts.port) {
+	    // if no port is specified manually, use the protocol default
+	    opts.port = this.secure ? '443' : '80';
+	  }
+	
+	  this.agent = opts.agent || false;
+	  this.hostname = opts.hostname ||
+	    (global.location ? location.hostname : 'localhost');
+	  this.port = opts.port || (global.location && location.port ?
+	       location.port :
+	       (this.secure ? 443 : 80));
+	  this.query = opts.query || {};
+	  if ('string' == typeof this.query) this.query = parseqs.decode(this.query);
+	  this.upgrade = false !== opts.upgrade;
+	  this.path = (opts.path || '/engine.io').replace(/\/$/, '') + '/';
+	  this.forceJSONP = !!opts.forceJSONP;
+	  this.jsonp = false !== opts.jsonp;
+	  this.forceBase64 = !!opts.forceBase64;
+	  this.enablesXDR = !!opts.enablesXDR;
+	  this.timestampParam = opts.timestampParam || 't';
+	  this.timestampRequests = opts.timestampRequests;
+	  this.transports = opts.transports || ['polling', 'websocket'];
+	  this.readyState = '';
+	  this.writeBuffer = [];
+	  this.policyPort = opts.policyPort || 843;
+	  this.rememberUpgrade = opts.rememberUpgrade || false;
+	  this.binaryType = null;
+	  this.onlyBinaryUpgrades = opts.onlyBinaryUpgrades;
+	  this.perMessageDeflate = false !== opts.perMessageDeflate ? (opts.perMessageDeflate || {}) : false;
+	
+	  if (true === this.perMessageDeflate) this.perMessageDeflate = {};
+	  if (this.perMessageDeflate && null == this.perMessageDeflate.threshold) {
+	    this.perMessageDeflate.threshold = 1024;
+	  }
+	
+	  // SSL options for Node.js client
+	  this.pfx = opts.pfx || null;
+	  this.key = opts.key || null;
+	  this.passphrase = opts.passphrase || null;
+	  this.cert = opts.cert || null;
+	  this.ca = opts.ca || null;
+	  this.ciphers = opts.ciphers || null;
+	  this.rejectUnauthorized = opts.rejectUnauthorized === undefined ? true : opts.rejectUnauthorized;
+	
+	  // other options for Node.js client
+	  var freeGlobal = typeof global == 'object' && global;
+	  if (freeGlobal.global === freeGlobal) {
+	    if (opts.extraHeaders && Object.keys(opts.extraHeaders).length > 0) {
+	      this.extraHeaders = opts.extraHeaders;
+	    }
+	  }
+	
+	  this.open();
+	}
+	
+	Socket.priorWebsocketSuccess = false;
+	
+	/**
+	 * Mix in `Emitter`.
+	 */
+	
+	Emitter(Socket.prototype);
+	
+	/**
+	 * Protocol version.
+	 *
+	 * @api public
+	 */
+	
+	Socket.protocol = parser.protocol; // this is an int
+	
+	/**
+	 * Expose deps for legacy compatibility
+	 * and standalone browser access.
+	 */
+	
+	Socket.Socket = Socket;
+	Socket.Transport = __webpack_require__(193);
+	Socket.transports = __webpack_require__(188);
+	Socket.parser = __webpack_require__(194);
+	
+	/**
+	 * Creates transport of the given type.
+	 *
+	 * @param {String} transport name
+	 * @return {Transport}
+	 * @api private
+	 */
+	
+	Socket.prototype.createTransport = function (name) {
+	  debug('creating transport "%s"', name);
+	  var query = clone(this.query);
+	
+	  // append engine.io protocol identifier
+	  query.EIO = parser.protocol;
+	
+	  // transport name
+	  query.transport = name;
+	
+	  // session id if we already have one
+	  if (this.id) query.sid = this.id;
+	
+	  var transport = new transports[name]({
+	    agent: this.agent,
+	    hostname: this.hostname,
+	    port: this.port,
+	    secure: this.secure,
+	    path: this.path,
+	    query: query,
+	    forceJSONP: this.forceJSONP,
+	    jsonp: this.jsonp,
+	    forceBase64: this.forceBase64,
+	    enablesXDR: this.enablesXDR,
+	    timestampRequests: this.timestampRequests,
+	    timestampParam: this.timestampParam,
+	    policyPort: this.policyPort,
+	    socket: this,
+	    pfx: this.pfx,
+	    key: this.key,
+	    passphrase: this.passphrase,
+	    cert: this.cert,
+	    ca: this.ca,
+	    ciphers: this.ciphers,
+	    rejectUnauthorized: this.rejectUnauthorized,
+	    perMessageDeflate: this.perMessageDeflate,
+	    extraHeaders: this.extraHeaders
+	  });
+	
+	  return transport;
+	};
+	
+	function clone (obj) {
+	  var o = {};
+	  for (var i in obj) {
+	    if (obj.hasOwnProperty(i)) {
+	      o[i] = obj[i];
+	    }
+	  }
+	  return o;
+	}
+	
+	/**
+	 * Initializes transport to use and starts probe.
+	 *
+	 * @api private
+	 */
+	Socket.prototype.open = function () {
+	  var transport;
+	  if (this.rememberUpgrade && Socket.priorWebsocketSuccess && this.transports.indexOf('websocket') != -1) {
+	    transport = 'websocket';
+	  } else if (0 === this.transports.length) {
+	    // Emit error on next tick so it can be listened to
+	    var self = this;
+	    setTimeout(function() {
+	      self.emit('error', 'No transports available');
+	    }, 0);
+	    return;
+	  } else {
+	    transport = this.transports[0];
+	  }
+	  this.readyState = 'opening';
+	
+	  // Retry with the next transport if the transport is disabled (jsonp: false)
+	  try {
+	    transport = this.createTransport(transport);
+	  } catch (e) {
+	    this.transports.shift();
+	    this.open();
+	    return;
+	  }
+	
+	  transport.open();
+	  this.setTransport(transport);
+	};
+	
+	/**
+	 * Sets the current transport. Disables the existing one (if any).
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.setTransport = function(transport){
+	  debug('setting transport %s', transport.name);
+	  var self = this;
+	
+	  if (this.transport) {
+	    debug('clearing existing transport %s', this.transport.name);
+	    this.transport.removeAllListeners();
+	  }
+	
+	  // set up transport
+	  this.transport = transport;
+	
+	  // set up transport listeners
+	  transport
+	  .on('drain', function(){
+	    self.onDrain();
+	  })
+	  .on('packet', function(packet){
+	    self.onPacket(packet);
+	  })
+	  .on('error', function(e){
+	    self.onError(e);
+	  })
+	  .on('close', function(){
+	    self.onClose('transport close');
+	  });
+	};
+	
+	/**
+	 * Probes a transport.
+	 *
+	 * @param {String} transport name
+	 * @api private
+	 */
+	
+	Socket.prototype.probe = function (name) {
+	  debug('probing transport "%s"', name);
+	  var transport = this.createTransport(name, { probe: 1 })
+	    , failed = false
+	    , self = this;
+	
+	  Socket.priorWebsocketSuccess = false;
+	
+	  function onTransportOpen(){
+	    if (self.onlyBinaryUpgrades) {
+	      var upgradeLosesBinary = !this.supportsBinary && self.transport.supportsBinary;
+	      failed = failed || upgradeLosesBinary;
+	    }
+	    if (failed) return;
+	
+	    debug('probe transport "%s" opened', name);
+	    transport.send([{ type: 'ping', data: 'probe' }]);
+	    transport.once('packet', function (msg) {
+	      if (failed) return;
+	      if ('pong' == msg.type && 'probe' == msg.data) {
+	        debug('probe transport "%s" pong', name);
+	        self.upgrading = true;
+	        self.emit('upgrading', transport);
+	        if (!transport) return;
+	        Socket.priorWebsocketSuccess = 'websocket' == transport.name;
+	
+	        debug('pausing current transport "%s"', self.transport.name);
+	        self.transport.pause(function () {
+	          if (failed) return;
+	          if ('closed' == self.readyState) return;
+	          debug('changing transport and sending upgrade packet');
+	
+	          cleanup();
+	
+	          self.setTransport(transport);
+	          transport.send([{ type: 'upgrade' }]);
+	          self.emit('upgrade', transport);
+	          transport = null;
+	          self.upgrading = false;
+	          self.flush();
+	        });
+	      } else {
+	        debug('probe transport "%s" failed', name);
+	        var err = new Error('probe error');
+	        err.transport = transport.name;
+	        self.emit('upgradeError', err);
+	      }
+	    });
+	  }
+	
+	  function freezeTransport() {
+	    if (failed) return;
+	
+	    // Any callback called by transport should be ignored since now
+	    failed = true;
+	
+	    cleanup();
+	
+	    transport.close();
+	    transport = null;
+	  }
+	
+	  //Handle any error that happens while probing
+	  function onerror(err) {
+	    var error = new Error('probe error: ' + err);
+	    error.transport = transport.name;
+	
+	    freezeTransport();
+	
+	    debug('probe transport "%s" failed because of error: %s', name, err);
+	
+	    self.emit('upgradeError', error);
+	  }
+	
+	  function onTransportClose(){
+	    onerror("transport closed");
+	  }
+	
+	  //When the socket is closed while we're probing
+	  function onclose(){
+	    onerror("socket closed");
+	  }
+	
+	  //When the socket is upgraded while we're probing
+	  function onupgrade(to){
+	    if (transport && to.name != transport.name) {
+	      debug('"%s" works - aborting "%s"', to.name, transport.name);
+	      freezeTransport();
+	    }
+	  }
+	
+	  //Remove all listeners on the transport and on self
+	  function cleanup(){
+	    transport.removeListener('open', onTransportOpen);
+	    transport.removeListener('error', onerror);
+	    transport.removeListener('close', onTransportClose);
+	    self.removeListener('close', onclose);
+	    self.removeListener('upgrading', onupgrade);
+	  }
+	
+	  transport.once('open', onTransportOpen);
+	  transport.once('error', onerror);
+	  transport.once('close', onTransportClose);
+	
+	  this.once('close', onclose);
+	  this.once('upgrading', onupgrade);
+	
+	  transport.open();
+	
+	};
+	
+	/**
+	 * Called when connection is deemed open.
+	 *
+	 * @api public
+	 */
+	
+	Socket.prototype.onOpen = function () {
+	  debug('socket open');
+	  this.readyState = 'open';
+	  Socket.priorWebsocketSuccess = 'websocket' == this.transport.name;
+	  this.emit('open');
+	  this.flush();
+	
+	  // we check for `readyState` in case an `open`
+	  // listener already closed the socket
+	  if ('open' == this.readyState && this.upgrade && this.transport.pause) {
+	    debug('starting upgrade probes');
+	    for (var i = 0, l = this.upgrades.length; i < l; i++) {
+	      this.probe(this.upgrades[i]);
+	    }
+	  }
+	};
+	
+	/**
+	 * Handles a packet.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onPacket = function (packet) {
+	  if ('opening' == this.readyState || 'open' == this.readyState) {
+	    debug('socket receive: type "%s", data "%s"', packet.type, packet.data);
+	
+	    this.emit('packet', packet);
+	
+	    // Socket is live - any packet counts
+	    this.emit('heartbeat');
+	
+	    switch (packet.type) {
+	      case 'open':
+	        this.onHandshake(parsejson(packet.data));
+	        break;
+	
+	      case 'pong':
+	        this.setPing();
+	        this.emit('pong');
+	        break;
+	
+	      case 'error':
+	        var err = new Error('server error');
+	        err.code = packet.data;
+	        this.onError(err);
+	        break;
+	
+	      case 'message':
+	        this.emit('data', packet.data);
+	        this.emit('message', packet.data);
+	        break;
+	    }
+	  } else {
+	    debug('packet received with socket readyState "%s"', this.readyState);
+	  }
+	};
+	
+	/**
+	 * Called upon handshake completion.
+	 *
+	 * @param {Object} handshake obj
+	 * @api private
+	 */
+	
+	Socket.prototype.onHandshake = function (data) {
+	  this.emit('handshake', data);
+	  this.id = data.sid;
+	  this.transport.query.sid = data.sid;
+	  this.upgrades = this.filterUpgrades(data.upgrades);
+	  this.pingInterval = data.pingInterval;
+	  this.pingTimeout = data.pingTimeout;
+	  this.onOpen();
+	  // In case open handler closes socket
+	  if  ('closed' == this.readyState) return;
+	  this.setPing();
+	
+	  // Prolong liveness of socket on heartbeat
+	  this.removeListener('heartbeat', this.onHeartbeat);
+	  this.on('heartbeat', this.onHeartbeat);
+	};
+	
+	/**
+	 * Resets ping timeout.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onHeartbeat = function (timeout) {
+	  clearTimeout(this.pingTimeoutTimer);
+	  var self = this;
+	  self.pingTimeoutTimer = setTimeout(function () {
+	    if ('closed' == self.readyState) return;
+	    self.onClose('ping timeout');
+	  }, timeout || (self.pingInterval + self.pingTimeout));
+	};
+	
+	/**
+	 * Pings server every `this.pingInterval` and expects response
+	 * within `this.pingTimeout` or closes connection.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.setPing = function () {
+	  var self = this;
+	  clearTimeout(self.pingIntervalTimer);
+	  self.pingIntervalTimer = setTimeout(function () {
+	    debug('writing ping packet - expecting pong within %sms', self.pingTimeout);
+	    self.ping();
+	    self.onHeartbeat(self.pingTimeout);
+	  }, self.pingInterval);
+	};
+	
+	/**
+	* Sends a ping packet.
+	*
+	* @api private
+	*/
+	
+	Socket.prototype.ping = function () {
+	  var self = this;
+	  this.sendPacket('ping', function(){
+	    self.emit('ping');
+	  });
+	};
+	
+	/**
+	 * Called on `drain` event
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onDrain = function() {
+	  this.writeBuffer.splice(0, this.prevBufferLen);
+	
+	  // setting prevBufferLen = 0 is very important
+	  // for example, when upgrading, upgrade packet is sent over,
+	  // and a nonzero prevBufferLen could cause problems on `drain`
+	  this.prevBufferLen = 0;
+	
+	  if (0 === this.writeBuffer.length) {
+	    this.emit('drain');
+	  } else {
+	    this.flush();
+	  }
+	};
+	
+	/**
+	 * Flush write buffers.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.flush = function () {
+	  if ('closed' != this.readyState && this.transport.writable &&
+	    !this.upgrading && this.writeBuffer.length) {
+	    debug('flushing %d packets in socket', this.writeBuffer.length);
+	    this.transport.send(this.writeBuffer);
+	    // keep track of current length of writeBuffer
+	    // splice writeBuffer and callbackBuffer on `drain`
+	    this.prevBufferLen = this.writeBuffer.length;
+	    this.emit('flush');
+	  }
+	};
+	
+	/**
+	 * Sends a message.
+	 *
+	 * @param {String} message.
+	 * @param {Function} callback function.
+	 * @param {Object} options.
+	 * @return {Socket} for chaining.
+	 * @api public
+	 */
+	
+	Socket.prototype.write =
+	Socket.prototype.send = function (msg, options, fn) {
+	  this.sendPacket('message', msg, options, fn);
+	  return this;
+	};
+	
+	/**
+	 * Sends a packet.
+	 *
+	 * @param {String} packet type.
+	 * @param {String} data.
+	 * @param {Object} options.
+	 * @param {Function} callback function.
+	 * @api private
+	 */
+	
+	Socket.prototype.sendPacket = function (type, data, options, fn) {
+	  if('function' == typeof data) {
+	    fn = data;
+	    data = undefined;
+	  }
+	
+	  if ('function' == typeof options) {
+	    fn = options;
+	    options = null;
+	  }
+	
+	  if ('closing' == this.readyState || 'closed' == this.readyState) {
+	    return;
+	  }
+	
+	  options = options || {};
+	  options.compress = false !== options.compress;
+	
+	  var packet = {
+	    type: type,
+	    data: data,
+	    options: options
+	  };
+	  this.emit('packetCreate', packet);
+	  this.writeBuffer.push(packet);
+	  if (fn) this.once('flush', fn);
+	  this.flush();
+	};
+	
+	/**
+	 * Closes the connection.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.close = function () {
+	  if ('opening' == this.readyState || 'open' == this.readyState) {
+	    this.readyState = 'closing';
+	
+	    var self = this;
+	
+	    if (this.writeBuffer.length) {
+	      this.once('drain', function() {
+	        if (this.upgrading) {
+	          waitForUpgrade();
+	        } else {
+	          close();
+	        }
+	      });
+	    } else if (this.upgrading) {
+	      waitForUpgrade();
+	    } else {
+	      close();
+	    }
+	  }
+	
+	  function close() {
+	    self.onClose('forced close');
+	    debug('socket closing - telling transport to close');
+	    self.transport.close();
+	  }
+	
+	  function cleanupAndClose() {
+	    self.removeListener('upgrade', cleanupAndClose);
+	    self.removeListener('upgradeError', cleanupAndClose);
+	    close();
+	  }
+	
+	  function waitForUpgrade() {
+	    // wait for upgrade to finish since we can't send packets while pausing a transport
+	    self.once('upgrade', cleanupAndClose);
+	    self.once('upgradeError', cleanupAndClose);
+	  }
+	
+	  return this;
+	};
+	
+	/**
+	 * Called upon transport error
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onError = function (err) {
+	  debug('socket error %j', err);
+	  Socket.priorWebsocketSuccess = false;
+	  this.emit('error', err);
+	  this.onClose('transport error', err);
+	};
+	
+	/**
+	 * Called upon transport close.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onClose = function (reason, desc) {
+	  if ('opening' == this.readyState || 'open' == this.readyState || 'closing' == this.readyState) {
+	    debug('socket close with reason: "%s"', reason);
+	    var self = this;
+	
+	    // clear timers
+	    clearTimeout(this.pingIntervalTimer);
+	    clearTimeout(this.pingTimeoutTimer);
+	
+	    // stop event from firing again for transport
+	    this.transport.removeAllListeners('close');
+	
+	    // ensure transport won't stay open
+	    this.transport.close();
+	
+	    // ignore further transport communication
+	    this.transport.removeAllListeners();
+	
+	    // set ready state
+	    this.readyState = 'closed';
+	
+	    // clear session id
+	    this.id = null;
+	
+	    // emit close event
+	    this.emit('close', reason, desc);
+	
+	    // clean buffers after, so users can still
+	    // grab the buffers on `close` event
+	    self.writeBuffer = [];
+	    self.prevBufferLen = 0;
+	  }
+	};
+	
+	/**
+	 * Filters upgrades, returning only those matching client transports.
+	 *
+	 * @param {Array} server upgrades
+	 * @api private
+	 *
+	 */
+	
+	Socket.prototype.filterUpgrades = function (upgrades) {
+	  var filteredUpgrades = [];
+	  for (var i = 0, j = upgrades.length; i<j; i++) {
+	    if (~index(this.transports, upgrades[i])) filteredUpgrades.push(upgrades[i]);
+	  }
+	  return filteredUpgrades;
+	};
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 188 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Module dependencies
+	 */
+	
+	var XMLHttpRequest = __webpack_require__(189);
+	var XHR = __webpack_require__(191);
+	var JSONP = __webpack_require__(206);
+	var websocket = __webpack_require__(207);
+	
+	/**
+	 * Export transports.
+	 */
+	
+	exports.polling = polling;
+	exports.websocket = websocket;
+	
+	/**
+	 * Polling transport polymorphic constructor.
+	 * Decides on xhr vs jsonp based on feature detection.
+	 *
+	 * @api private
+	 */
+	
+	function polling(opts){
+	  var xhr;
+	  var xd = false;
+	  var xs = false;
+	  var jsonp = false !== opts.jsonp;
+	
+	  if (global.location) {
+	    var isSSL = 'https:' == location.protocol;
+	    var port = location.port;
+	
+	    // some user agents have empty `location.port`
+	    if (!port) {
+	      port = isSSL ? 443 : 80;
+	    }
+	
+	    xd = opts.hostname != location.hostname || port != opts.port;
+	    xs = opts.secure != isSSL;
+	  }
+	
+	  opts.xdomain = xd;
+	  opts.xscheme = xs;
+	  xhr = new XMLHttpRequest(opts);
+	
+	  if ('open' in xhr && !opts.forceJSONP) {
+	    return new XHR(opts);
+	  } else {
+	    if (!jsonp) throw new Error('JSONP disabled');
+	    return new JSONP(opts);
+	  }
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 189 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// browser shim for xmlhttprequest module
+	var hasCORS = __webpack_require__(190);
+	
+	module.exports = function(opts) {
+	  var xdomain = opts.xdomain;
+	
+	  // scheme must be same when usign XDomainRequest
+	  // http://blogs.msdn.com/b/ieinternals/archive/2010/05/13/xdomainrequest-restrictions-limitations-and-workarounds.aspx
+	  var xscheme = opts.xscheme;
+	
+	  // XDomainRequest has a flow of not sending cookie, therefore it should be disabled as a default.
+	  // https://github.com/Automattic/engine.io-client/pull/217
+	  var enablesXDR = opts.enablesXDR;
+	
+	  // XMLHttpRequest can be disabled on IE
+	  try {
+	    if ('undefined' != typeof XMLHttpRequest && (!xdomain || hasCORS)) {
+	      return new XMLHttpRequest();
+	    }
+	  } catch (e) { }
+	
+	  // Use XDomainRequest for IE8 if enablesXDR is true
+	  // because loading bar keeps flashing when using jsonp-polling
+	  // https://github.com/yujiosaka/socke.io-ie8-loading-example
+	  try {
+	    if ('undefined' != typeof XDomainRequest && !xscheme && enablesXDR) {
+	      return new XDomainRequest();
+	    }
+	  } catch (e) { }
+	
+	  if (!xdomain) {
+	    try {
+	      return new ActiveXObject('Microsoft.XMLHTTP');
+	    } catch(e) { }
+	  }
+	}
+
+
+/***/ },
+/* 190 */
+/***/ function(module, exports) {
+
+	
+	/**
+	 * Module exports.
+	 *
+	 * Logic borrowed from Modernizr:
+	 *
+	 *   - https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cors.js
+	 */
+	
+	try {
+	  module.exports = typeof XMLHttpRequest !== 'undefined' &&
+	    'withCredentials' in new XMLHttpRequest();
+	} catch (err) {
+	  // if XMLHttp support is disabled in IE then it will throw
+	  // when trying to create
+	  module.exports = false;
+	}
+
+
+/***/ },
+/* 191 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Module requirements.
+	 */
+	
+	var XMLHttpRequest = __webpack_require__(189);
+	var Polling = __webpack_require__(192);
+	var Emitter = __webpack_require__(181);
+	var inherit = __webpack_require__(204);
+	var debug = __webpack_require__(173)('engine.io-client:polling-xhr');
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = XHR;
+	module.exports.Request = Request;
+	
+	/**
+	 * Empty function
+	 */
+	
+	function empty(){}
+	
+	/**
+	 * XHR Polling constructor.
+	 *
+	 * @param {Object} opts
+	 * @api public
+	 */
+	
+	function XHR(opts){
+	  Polling.call(this, opts);
+	
+	  if (global.location) {
+	    var isSSL = 'https:' == location.protocol;
+	    var port = location.port;
+	
+	    // some user agents have empty `location.port`
+	    if (!port) {
+	      port = isSSL ? 443 : 80;
+	    }
+	
+	    this.xd = opts.hostname != global.location.hostname ||
+	      port != opts.port;
+	    this.xs = opts.secure != isSSL;
+	  } else {
+	    this.extraHeaders = opts.extraHeaders;
+	  }
+	}
+	
+	/**
+	 * Inherits from Polling.
+	 */
+	
+	inherit(XHR, Polling);
+	
+	/**
+	 * XHR supports binary
+	 */
+	
+	XHR.prototype.supportsBinary = true;
+	
+	/**
+	 * Creates a request.
+	 *
+	 * @param {String} method
+	 * @api private
+	 */
+	
+	XHR.prototype.request = function(opts){
+	  opts = opts || {};
+	  opts.uri = this.uri();
+	  opts.xd = this.xd;
+	  opts.xs = this.xs;
+	  opts.agent = this.agent || false;
+	  opts.supportsBinary = this.supportsBinary;
+	  opts.enablesXDR = this.enablesXDR;
+	
+	  // SSL options for Node.js client
+	  opts.pfx = this.pfx;
+	  opts.key = this.key;
+	  opts.passphrase = this.passphrase;
+	  opts.cert = this.cert;
+	  opts.ca = this.ca;
+	  opts.ciphers = this.ciphers;
+	  opts.rejectUnauthorized = this.rejectUnauthorized;
+	
+	  // other options for Node.js client
+	  opts.extraHeaders = this.extraHeaders;
+	
+	  return new Request(opts);
+	};
+	
+	/**
+	 * Sends data.
+	 *
+	 * @param {String} data to send.
+	 * @param {Function} called upon flush.
+	 * @api private
+	 */
+	
+	XHR.prototype.doWrite = function(data, fn){
+	  var isBinary = typeof data !== 'string' && data !== undefined;
+	  var req = this.request({ method: 'POST', data: data, isBinary: isBinary });
+	  var self = this;
+	  req.on('success', fn);
+	  req.on('error', function(err){
+	    self.onError('xhr post error', err);
+	  });
+	  this.sendXhr = req;
+	};
+	
+	/**
+	 * Starts a poll cycle.
+	 *
+	 * @api private
+	 */
+	
+	XHR.prototype.doPoll = function(){
+	  debug('xhr poll');
+	  var req = this.request();
+	  var self = this;
+	  req.on('data', function(data){
+	    self.onData(data);
+	  });
+	  req.on('error', function(err){
+	    self.onError('xhr poll error', err);
+	  });
+	  this.pollXhr = req;
+	};
+	
+	/**
+	 * Request constructor
+	 *
+	 * @param {Object} options
+	 * @api public
+	 */
+	
+	function Request(opts){
+	  this.method = opts.method || 'GET';
+	  this.uri = opts.uri;
+	  this.xd = !!opts.xd;
+	  this.xs = !!opts.xs;
+	  this.async = false !== opts.async;
+	  this.data = undefined != opts.data ? opts.data : null;
+	  this.agent = opts.agent;
+	  this.isBinary = opts.isBinary;
+	  this.supportsBinary = opts.supportsBinary;
+	  this.enablesXDR = opts.enablesXDR;
+	
+	  // SSL options for Node.js client
+	  this.pfx = opts.pfx;
+	  this.key = opts.key;
+	  this.passphrase = opts.passphrase;
+	  this.cert = opts.cert;
+	  this.ca = opts.ca;
+	  this.ciphers = opts.ciphers;
+	  this.rejectUnauthorized = opts.rejectUnauthorized;
+	
+	  // other options for Node.js client
+	  this.extraHeaders = opts.extraHeaders;
+	
+	  this.create();
+	}
+	
+	/**
+	 * Mix in `Emitter`.
+	 */
+	
+	Emitter(Request.prototype);
+	
+	/**
+	 * Creates the XHR object and sends the request.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.create = function(){
+	  var opts = { agent: this.agent, xdomain: this.xd, xscheme: this.xs, enablesXDR: this.enablesXDR };
+	
+	  // SSL options for Node.js client
+	  opts.pfx = this.pfx;
+	  opts.key = this.key;
+	  opts.passphrase = this.passphrase;
+	  opts.cert = this.cert;
+	  opts.ca = this.ca;
+	  opts.ciphers = this.ciphers;
+	  opts.rejectUnauthorized = this.rejectUnauthorized;
+	
+	  var xhr = this.xhr = new XMLHttpRequest(opts);
+	  var self = this;
+	
+	  try {
+	    debug('xhr open %s: %s', this.method, this.uri);
+	    xhr.open(this.method, this.uri, this.async);
+	    try {
+	      if (this.extraHeaders) {
+	        xhr.setDisableHeaderCheck(true);
+	        for (var i in this.extraHeaders) {
+	          if (this.extraHeaders.hasOwnProperty(i)) {
+	            xhr.setRequestHeader(i, this.extraHeaders[i]);
+	          }
+	        }
+	      }
+	    } catch (e) {}
+	    if (this.supportsBinary) {
+	      // This has to be done after open because Firefox is stupid
+	      // http://stackoverflow.com/questions/13216903/get-binary-data-with-xmlhttprequest-in-a-firefox-extension
+	      xhr.responseType = 'arraybuffer';
+	    }
+	
+	    if ('POST' == this.method) {
+	      try {
+	        if (this.isBinary) {
+	          xhr.setRequestHeader('Content-type', 'application/octet-stream');
+	        } else {
+	          xhr.setRequestHeader('Content-type', 'text/plain;charset=UTF-8');
+	        }
+	      } catch (e) {}
+	    }
+	
+	    // ie6 check
+	    if ('withCredentials' in xhr) {
+	      xhr.withCredentials = true;
+	    }
+	
+	    if (this.hasXDR()) {
+	      xhr.onload = function(){
+	        self.onLoad();
+	      };
+	      xhr.onerror = function(){
+	        self.onError(xhr.responseText);
+	      };
+	    } else {
+	      xhr.onreadystatechange = function(){
+	        if (4 != xhr.readyState) return;
+	        if (200 == xhr.status || 1223 == xhr.status) {
+	          self.onLoad();
+	        } else {
+	          // make sure the `error` event handler that's user-set
+	          // does not throw in the same tick and gets caught here
+	          setTimeout(function(){
+	            self.onError(xhr.status);
+	          }, 0);
+	        }
+	      };
+	    }
+	
+	    debug('xhr data %s', this.data);
+	    xhr.send(this.data);
+	  } catch (e) {
+	    // Need to defer since .create() is called directly fhrom the constructor
+	    // and thus the 'error' event can only be only bound *after* this exception
+	    // occurs.  Therefore, also, we cannot throw here at all.
+	    setTimeout(function() {
+	      self.onError(e);
+	    }, 0);
+	    return;
+	  }
+	
+	  if (global.document) {
+	    this.index = Request.requestsCount++;
+	    Request.requests[this.index] = this;
+	  }
+	};
+	
+	/**
+	 * Called upon successful response.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.onSuccess = function(){
+	  this.emit('success');
+	  this.cleanup();
+	};
+	
+	/**
+	 * Called if we have data.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.onData = function(data){
+	  this.emit('data', data);
+	  this.onSuccess();
+	};
+	
+	/**
+	 * Called upon error.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.onError = function(err){
+	  this.emit('error', err);
+	  this.cleanup(true);
+	};
+	
+	/**
+	 * Cleans up house.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.cleanup = function(fromError){
+	  if ('undefined' == typeof this.xhr || null === this.xhr) {
+	    return;
+	  }
+	  // xmlhttprequest
+	  if (this.hasXDR()) {
+	    this.xhr.onload = this.xhr.onerror = empty;
+	  } else {
+	    this.xhr.onreadystatechange = empty;
+	  }
+	
+	  if (fromError) {
+	    try {
+	      this.xhr.abort();
+	    } catch(e) {}
+	  }
+	
+	  if (global.document) {
+	    delete Request.requests[this.index];
+	  }
+	
+	  this.xhr = null;
+	};
+	
+	/**
+	 * Called upon load.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.onLoad = function(){
+	  var data;
+	  try {
+	    var contentType;
+	    try {
+	      contentType = this.xhr.getResponseHeader('Content-Type').split(';')[0];
+	    } catch (e) {}
+	    if (contentType === 'application/octet-stream') {
+	      data = this.xhr.response;
+	    } else {
+	      if (!this.supportsBinary) {
+	        data = this.xhr.responseText;
+	      } else {
+	        try {
+	          data = String.fromCharCode.apply(null, new Uint8Array(this.xhr.response));
+	        } catch (e) {
+	          var ui8Arr = new Uint8Array(this.xhr.response);
+	          var dataArray = [];
+	          for (var idx = 0, length = ui8Arr.length; idx < length; idx++) {
+	            dataArray.push(ui8Arr[idx]);
+	          }
+	
+	          data = String.fromCharCode.apply(null, dataArray);
+	        }
+	      }
+	    }
+	  } catch (e) {
+	    this.onError(e);
+	  }
+	  if (null != data) {
+	    this.onData(data);
+	  }
+	};
+	
+	/**
+	 * Check if it has XDomainRequest.
+	 *
+	 * @api private
+	 */
+	
+	Request.prototype.hasXDR = function(){
+	  return 'undefined' !== typeof global.XDomainRequest && !this.xs && this.enablesXDR;
+	};
+	
+	/**
+	 * Aborts the request.
+	 *
+	 * @api public
+	 */
+	
+	Request.prototype.abort = function(){
+	  this.cleanup();
+	};
+	
+	/**
+	 * Aborts pending requests when unloading the window. This is needed to prevent
+	 * memory leaks (e.g. when using IE) and to ensure that no spurious error is
+	 * emitted.
+	 */
+	
+	if (global.document) {
+	  Request.requestsCount = 0;
+	  Request.requests = {};
+	  if (global.attachEvent) {
+	    global.attachEvent('onunload', unloadHandler);
+	  } else if (global.addEventListener) {
+	    global.addEventListener('beforeunload', unloadHandler, false);
+	  }
+	}
+	
+	function unloadHandler() {
+	  for (var i in Request.requests) {
+	    if (Request.requests.hasOwnProperty(i)) {
+	      Request.requests[i].abort();
+	    }
+	  }
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 192 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Module dependencies.
+	 */
+	
+	var Transport = __webpack_require__(193);
+	var parseqs = __webpack_require__(203);
+	var parser = __webpack_require__(194);
+	var inherit = __webpack_require__(204);
+	var yeast = __webpack_require__(205);
+	var debug = __webpack_require__(173)('engine.io-client:polling');
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = Polling;
+	
+	/**
+	 * Is XHR2 supported?
+	 */
+	
+	var hasXHR2 = (function() {
+	  var XMLHttpRequest = __webpack_require__(189);
+	  var xhr = new XMLHttpRequest({ xdomain: false });
+	  return null != xhr.responseType;
+	})();
+	
+	/**
+	 * Polling interface.
+	 *
+	 * @param {Object} opts
+	 * @api private
+	 */
+	
+	function Polling(opts){
+	  var forceBase64 = (opts && opts.forceBase64);
+	  if (!hasXHR2 || forceBase64) {
+	    this.supportsBinary = false;
+	  }
+	  Transport.call(this, opts);
+	}
+	
+	/**
+	 * Inherits from Transport.
+	 */
+	
+	inherit(Polling, Transport);
+	
+	/**
+	 * Transport name.
+	 */
+	
+	Polling.prototype.name = 'polling';
+	
+	/**
+	 * Opens the socket (triggers polling). We write a PING message to determine
+	 * when the transport is open.
+	 *
+	 * @api private
+	 */
+	
+	Polling.prototype.doOpen = function(){
+	  this.poll();
+	};
+	
+	/**
+	 * Pauses polling.
+	 *
+	 * @param {Function} callback upon buffers are flushed and transport is paused
+	 * @api private
+	 */
+	
+	Polling.prototype.pause = function(onPause){
+	  var pending = 0;
+	  var self = this;
+	
+	  this.readyState = 'pausing';
+	
+	  function pause(){
+	    debug('paused');
+	    self.readyState = 'paused';
+	    onPause();
+	  }
+	
+	  if (this.polling || !this.writable) {
+	    var total = 0;
+	
+	    if (this.polling) {
+	      debug('we are currently polling - waiting to pause');
+	      total++;
+	      this.once('pollComplete', function(){
+	        debug('pre-pause polling complete');
+	        --total || pause();
+	      });
+	    }
+	
+	    if (!this.writable) {
+	      debug('we are currently writing - waiting to pause');
+	      total++;
+	      this.once('drain', function(){
+	        debug('pre-pause writing complete');
+	        --total || pause();
+	      });
+	    }
+	  } else {
+	    pause();
+	  }
+	};
+	
+	/**
+	 * Starts polling cycle.
+	 *
+	 * @api public
+	 */
+	
+	Polling.prototype.poll = function(){
+	  debug('polling');
+	  this.polling = true;
+	  this.doPoll();
+	  this.emit('poll');
+	};
+	
+	/**
+	 * Overloads onData to detect payloads.
+	 *
+	 * @api private
+	 */
+	
+	Polling.prototype.onData = function(data){
+	  var self = this;
+	  debug('polling got data %s', data);
+	  var callback = function(packet, index, total) {
+	    // if its the first message we consider the transport open
+	    if ('opening' == self.readyState) {
+	      self.onOpen();
+	    }
+	
+	    // if its a close packet, we close the ongoing requests
+	    if ('close' == packet.type) {
+	      self.onClose();
+	      return false;
+	    }
+	
+	    // otherwise bypass onData and handle the message
+	    self.onPacket(packet);
+	  };
+	
+	  // decode payload
+	  parser.decodePayload(data, this.socket.binaryType, callback);
+	
+	  // if an event did not trigger closing
+	  if ('closed' != this.readyState) {
+	    // if we got data we're not polling
+	    this.polling = false;
+	    this.emit('pollComplete');
+	
+	    if ('open' == this.readyState) {
+	      this.poll();
+	    } else {
+	      debug('ignoring poll - transport state "%s"', this.readyState);
+	    }
+	  }
+	};
+	
+	/**
+	 * For polling, send a close packet.
+	 *
+	 * @api private
+	 */
+	
+	Polling.prototype.doClose = function(){
+	  var self = this;
+	
+	  function close(){
+	    debug('writing close packet');
+	    self.write([{ type: 'close' }]);
+	  }
+	
+	  if ('open' == this.readyState) {
+	    debug('transport open - closing');
+	    close();
+	  } else {
+	    // in case we're trying to close while
+	    // handshaking is in progress (GH-164)
+	    debug('transport not open - deferring close');
+	    this.once('open', close);
+	  }
+	};
+	
+	/**
+	 * Writes a packets payload.
+	 *
+	 * @param {Array} data packets
+	 * @param {Function} drain callback
+	 * @api private
+	 */
+	
+	Polling.prototype.write = function(packets){
+	  var self = this;
+	  this.writable = false;
+	  var callbackfn = function() {
+	    self.writable = true;
+	    self.emit('drain');
+	  };
+	
+	  var self = this;
+	  parser.encodePayload(packets, this.supportsBinary, function(data) {
+	    self.doWrite(data, callbackfn);
+	  });
+	};
+	
+	/**
+	 * Generates uri for connection.
+	 *
+	 * @api private
+	 */
+	
+	Polling.prototype.uri = function(){
+	  var query = this.query || {};
+	  var schema = this.secure ? 'https' : 'http';
+	  var port = '';
+	
+	  // cache busting is forced
+	  if (false !== this.timestampRequests) {
+	    query[this.timestampParam] = yeast();
+	  }
+	
+	  if (!this.supportsBinary && !query.sid) {
+	    query.b64 = 1;
+	  }
+	
+	  query = parseqs.encode(query);
+	
+	  // avoid port if default for schema
+	  if (this.port && (('https' == schema && this.port != 443) ||
+	     ('http' == schema && this.port != 80))) {
+	    port = ':' + this.port;
+	  }
+	
+	  // prepend ? to query
+	  if (query.length) {
+	    query = '?' + query;
+	  }
+	
+	  var ipv6 = this.hostname.indexOf(':') !== -1;
+	  return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
+	};
+
+
+/***/ },
+/* 193 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Module dependencies.
+	 */
+	
+	var parser = __webpack_require__(194);
+	var Emitter = __webpack_require__(181);
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = Transport;
+	
+	/**
+	 * Transport abstract constructor.
+	 *
+	 * @param {Object} options.
+	 * @api private
+	 */
+	
+	function Transport (opts) {
+	  this.path = opts.path;
+	  this.hostname = opts.hostname;
+	  this.port = opts.port;
+	  this.secure = opts.secure;
+	  this.query = opts.query;
+	  this.timestampParam = opts.timestampParam;
+	  this.timestampRequests = opts.timestampRequests;
+	  this.readyState = '';
+	  this.agent = opts.agent || false;
+	  this.socket = opts.socket;
+	  this.enablesXDR = opts.enablesXDR;
+	
+	  // SSL options for Node.js client
+	  this.pfx = opts.pfx;
+	  this.key = opts.key;
+	  this.passphrase = opts.passphrase;
+	  this.cert = opts.cert;
+	  this.ca = opts.ca;
+	  this.ciphers = opts.ciphers;
+	  this.rejectUnauthorized = opts.rejectUnauthorized;
+	
+	  // other options for Node.js client
+	  this.extraHeaders = opts.extraHeaders;
+	}
+	
+	/**
+	 * Mix in `Emitter`.
+	 */
+	
+	Emitter(Transport.prototype);
+	
+	/**
+	 * Emits an error.
+	 *
+	 * @param {String} str
+	 * @return {Transport} for chaining
+	 * @api public
+	 */
+	
+	Transport.prototype.onError = function (msg, desc) {
+	  var err = new Error(msg);
+	  err.type = 'TransportError';
+	  err.description = desc;
+	  this.emit('error', err);
+	  return this;
+	};
+	
+	/**
+	 * Opens the transport.
+	 *
+	 * @api public
+	 */
+	
+	Transport.prototype.open = function () {
+	  if ('closed' == this.readyState || '' == this.readyState) {
+	    this.readyState = 'opening';
+	    this.doOpen();
+	  }
+	
+	  return this;
+	};
+	
+	/**
+	 * Closes the transport.
+	 *
+	 * @api private
+	 */
+	
+	Transport.prototype.close = function () {
+	  if ('opening' == this.readyState || 'open' == this.readyState) {
+	    this.doClose();
+	    this.onClose();
+	  }
+	
+	  return this;
+	};
+	
+	/**
+	 * Sends multiple packets.
+	 *
+	 * @param {Array} packets
+	 * @api private
+	 */
+	
+	Transport.prototype.send = function(packets){
+	  if ('open' == this.readyState) {
+	    this.write(packets);
+	  } else {
+	    throw new Error('Transport not open');
+	  }
+	};
+	
+	/**
+	 * Called upon open
+	 *
+	 * @api private
+	 */
+	
+	Transport.prototype.onOpen = function () {
+	  this.readyState = 'open';
+	  this.writable = true;
+	  this.emit('open');
+	};
+	
+	/**
+	 * Called with data.
+	 *
+	 * @param {String} data
+	 * @api private
+	 */
+	
+	Transport.prototype.onData = function(data){
+	  var packet = parser.decodePacket(data, this.socket.binaryType);
+	  this.onPacket(packet);
+	};
+	
+	/**
+	 * Called with a decoded packet.
+	 */
+	
+	Transport.prototype.onPacket = function (packet) {
+	  this.emit('packet', packet);
+	};
+	
+	/**
+	 * Called upon close.
+	 *
+	 * @api private
+	 */
+	
+	Transport.prototype.onClose = function () {
+	  this.readyState = 'closed';
+	  this.emit('close');
+	};
+
+
+/***/ },
+/* 194 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Module dependencies.
+	 */
+	
+	var keys = __webpack_require__(195);
+	var hasBinary = __webpack_require__(196);
+	var sliceBuffer = __webpack_require__(198);
+	var base64encoder = __webpack_require__(199);
+	var after = __webpack_require__(200);
+	var utf8 = __webpack_require__(201);
+	
+	/**
+	 * Check if we are running an android browser. That requires us to use
+	 * ArrayBuffer with polling transports...
+	 *
+	 * http://ghinda.net/jpeg-blob-ajax-android/
+	 */
+	
+	var isAndroid = navigator.userAgent.match(/Android/i);
+	
+	/**
+	 * Check if we are running in PhantomJS.
+	 * Uploading a Blob with PhantomJS does not work correctly, as reported here:
+	 * https://github.com/ariya/phantomjs/issues/11395
+	 * @type boolean
+	 */
+	var isPhantomJS = /PhantomJS/i.test(navigator.userAgent);
+	
+	/**
+	 * When true, avoids using Blobs to encode payloads.
+	 * @type boolean
+	 */
+	var dontSendBlobs = isAndroid || isPhantomJS;
+	
+	/**
+	 * Current protocol version.
+	 */
+	
+	exports.protocol = 3;
+	
+	/**
+	 * Packet types.
+	 */
+	
+	var packets = exports.packets = {
+	    open:     0    // non-ws
+	  , close:    1    // non-ws
+	  , ping:     2
+	  , pong:     3
+	  , message:  4
+	  , upgrade:  5
+	  , noop:     6
+	};
+	
+	var packetslist = keys(packets);
+	
+	/**
+	 * Premade error packet.
+	 */
+	
+	var err = { type: 'error', data: 'parser error' };
+	
+	/**
+	 * Create a blob api even for blob builder when vendor prefixes exist
+	 */
+	
+	var Blob = __webpack_require__(202);
+	
+	/**
+	 * Encodes a packet.
+	 *
+	 *     <packet type id> [ <data> ]
+	 *
+	 * Example:
+	 *
+	 *     5hello world
+	 *     3
+	 *     4
+	 *
+	 * Binary is encoded in an identical principle
+	 *
+	 * @api private
+	 */
+	
+	exports.encodePacket = function (packet, supportsBinary, utf8encode, callback) {
+	  if ('function' == typeof supportsBinary) {
+	    callback = supportsBinary;
+	    supportsBinary = false;
+	  }
+	
+	  if ('function' == typeof utf8encode) {
+	    callback = utf8encode;
+	    utf8encode = null;
+	  }
+	
+	  var data = (packet.data === undefined)
+	    ? undefined
+	    : packet.data.buffer || packet.data;
+	
+	  if (global.ArrayBuffer && data instanceof ArrayBuffer) {
+	    return encodeArrayBuffer(packet, supportsBinary, callback);
+	  } else if (Blob && data instanceof global.Blob) {
+	    return encodeBlob(packet, supportsBinary, callback);
+	  }
+	
+	  // might be an object with { base64: true, data: dataAsBase64String }
+	  if (data && data.base64) {
+	    return encodeBase64Object(packet, callback);
+	  }
+	
+	  // Sending data as a utf-8 string
+	  var encoded = packets[packet.type];
+	
+	  // data fragment is optional
+	  if (undefined !== packet.data) {
+	    encoded += utf8encode ? utf8.encode(String(packet.data)) : String(packet.data);
+	  }
+	
+	  return callback('' + encoded);
+	
+	};
+	
+	function encodeBase64Object(packet, callback) {
+	  // packet data is an object { base64: true, data: dataAsBase64String }
+	  var message = 'b' + exports.packets[packet.type] + packet.data.data;
+	  return callback(message);
+	}
+	
+	/**
+	 * Encode packet helpers for binary types
+	 */
+	
+	function encodeArrayBuffer(packet, supportsBinary, callback) {
+	  if (!supportsBinary) {
+	    return exports.encodeBase64Packet(packet, callback);
+	  }
+	
+	  var data = packet.data;
+	  var contentArray = new Uint8Array(data);
+	  var resultBuffer = new Uint8Array(1 + data.byteLength);
+	
+	  resultBuffer[0] = packets[packet.type];
+	  for (var i = 0; i < contentArray.length; i++) {
+	    resultBuffer[i+1] = contentArray[i];
+	  }
+	
+	  return callback(resultBuffer.buffer);
+	}
+	
+	function encodeBlobAsArrayBuffer(packet, supportsBinary, callback) {
+	  if (!supportsBinary) {
+	    return exports.encodeBase64Packet(packet, callback);
+	  }
+	
+	  var fr = new FileReader();
+	  fr.onload = function() {
+	    packet.data = fr.result;
+	    exports.encodePacket(packet, supportsBinary, true, callback);
+	  };
+	  return fr.readAsArrayBuffer(packet.data);
+	}
+	
+	function encodeBlob(packet, supportsBinary, callback) {
+	  if (!supportsBinary) {
+	    return exports.encodeBase64Packet(packet, callback);
+	  }
+	
+	  if (dontSendBlobs) {
+	    return encodeBlobAsArrayBuffer(packet, supportsBinary, callback);
+	  }
+	
+	  var length = new Uint8Array(1);
+	  length[0] = packets[packet.type];
+	  var blob = new Blob([length.buffer, packet.data]);
+	
+	  return callback(blob);
+	}
+	
+	/**
+	 * Encodes a packet with binary data in a base64 string
+	 *
+	 * @param {Object} packet, has `type` and `data`
+	 * @return {String} base64 encoded message
+	 */
+	
+	exports.encodeBase64Packet = function(packet, callback) {
+	  var message = 'b' + exports.packets[packet.type];
+	  if (Blob && packet.data instanceof global.Blob) {
+	    var fr = new FileReader();
+	    fr.onload = function() {
+	      var b64 = fr.result.split(',')[1];
+	      callback(message + b64);
+	    };
+	    return fr.readAsDataURL(packet.data);
+	  }
+	
+	  var b64data;
+	  try {
+	    b64data = String.fromCharCode.apply(null, new Uint8Array(packet.data));
+	  } catch (e) {
+	    // iPhone Safari doesn't let you apply with typed arrays
+	    var typed = new Uint8Array(packet.data);
+	    var basic = new Array(typed.length);
+	    for (var i = 0; i < typed.length; i++) {
+	      basic[i] = typed[i];
+	    }
+	    b64data = String.fromCharCode.apply(null, basic);
+	  }
+	  message += global.btoa(b64data);
+	  return callback(message);
+	};
+	
+	/**
+	 * Decodes a packet. Changes format to Blob if requested.
+	 *
+	 * @return {Object} with `type` and `data` (if any)
+	 * @api private
+	 */
+	
+	exports.decodePacket = function (data, binaryType, utf8decode) {
+	  // String data
+	  if (typeof data == 'string' || data === undefined) {
+	    if (data.charAt(0) == 'b') {
+	      return exports.decodeBase64Packet(data.substr(1), binaryType);
+	    }
+	
+	    if (utf8decode) {
+	      try {
+	        data = utf8.decode(data);
+	      } catch (e) {
+	        return err;
+	      }
+	    }
+	    var type = data.charAt(0);
+	
+	    if (Number(type) != type || !packetslist[type]) {
+	      return err;
+	    }
+	
+	    if (data.length > 1) {
+	      return { type: packetslist[type], data: data.substring(1) };
+	    } else {
+	      return { type: packetslist[type] };
+	    }
+	  }
+	
+	  var asArray = new Uint8Array(data);
+	  var type = asArray[0];
+	  var rest = sliceBuffer(data, 1);
+	  if (Blob && binaryType === 'blob') {
+	    rest = new Blob([rest]);
+	  }
+	  return { type: packetslist[type], data: rest };
+	};
+	
+	/**
+	 * Decodes a packet encoded in a base64 string
+	 *
+	 * @param {String} base64 encoded message
+	 * @return {Object} with `type` and `data` (if any)
+	 */
+	
+	exports.decodeBase64Packet = function(msg, binaryType) {
+	  var type = packetslist[msg.charAt(0)];
+	  if (!global.ArrayBuffer) {
+	    return { type: type, data: { base64: true, data: msg.substr(1) } };
+	  }
+	
+	  var data = base64encoder.decode(msg.substr(1));
+	
+	  if (binaryType === 'blob' && Blob) {
+	    data = new Blob([data]);
+	  }
+	
+	  return { type: type, data: data };
+	};
+	
+	/**
+	 * Encodes multiple messages (payload).
+	 *
+	 *     <length>:data
+	 *
+	 * Example:
+	 *
+	 *     11:hello world2:hi
+	 *
+	 * If any contents are binary, they will be encoded as base64 strings. Base64
+	 * encoded strings are marked with a b before the length specifier
+	 *
+	 * @param {Array} packets
+	 * @api private
+	 */
+	
+	exports.encodePayload = function (packets, supportsBinary, callback) {
+	  if (typeof supportsBinary == 'function') {
+	    callback = supportsBinary;
+	    supportsBinary = null;
+	  }
+	
+	  var isBinary = hasBinary(packets);
+	
+	  if (supportsBinary && isBinary) {
+	    if (Blob && !dontSendBlobs) {
+	      return exports.encodePayloadAsBlob(packets, callback);
+	    }
+	
+	    return exports.encodePayloadAsArrayBuffer(packets, callback);
+	  }
+	
+	  if (!packets.length) {
+	    return callback('0:');
+	  }
+	
+	  function setLengthHeader(message) {
+	    return message.length + ':' + message;
+	  }
+	
+	  function encodeOne(packet, doneCallback) {
+	    exports.encodePacket(packet, !isBinary ? false : supportsBinary, true, function(message) {
+	      doneCallback(null, setLengthHeader(message));
+	    });
+	  }
+	
+	  map(packets, encodeOne, function(err, results) {
+	    return callback(results.join(''));
+	  });
+	};
+	
+	/**
+	 * Async array map using after
+	 */
+	
+	function map(ary, each, done) {
+	  var result = new Array(ary.length);
+	  var next = after(ary.length, done);
+	
+	  var eachWithIndex = function(i, el, cb) {
+	    each(el, function(error, msg) {
+	      result[i] = msg;
+	      cb(error, result);
+	    });
+	  };
+	
+	  for (var i = 0; i < ary.length; i++) {
+	    eachWithIndex(i, ary[i], next);
+	  }
+	}
+	
+	/*
+	 * Decodes data when a payload is maybe expected. Possible binary contents are
+	 * decoded from their base64 representation
+	 *
+	 * @param {String} data, callback method
+	 * @api public
+	 */
+	
+	exports.decodePayload = function (data, binaryType, callback) {
+	  if (typeof data != 'string') {
+	    return exports.decodePayloadAsBinary(data, binaryType, callback);
+	  }
+	
+	  if (typeof binaryType === 'function') {
+	    callback = binaryType;
+	    binaryType = null;
+	  }
+	
+	  var packet;
+	  if (data == '') {
+	    // parser error - ignoring payload
+	    return callback(err, 0, 1);
+	  }
+	
+	  var length = ''
+	    , n, msg;
+	
+	  for (var i = 0, l = data.length; i < l; i++) {
+	    var chr = data.charAt(i);
+	
+	    if (':' != chr) {
+	      length += chr;
+	    } else {
+	      if ('' == length || (length != (n = Number(length)))) {
+	        // parser error - ignoring payload
+	        return callback(err, 0, 1);
+	      }
+	
+	      msg = data.substr(i + 1, n);
+	
+	      if (length != msg.length) {
+	        // parser error - ignoring payload
+	        return callback(err, 0, 1);
+	      }
+	
+	      if (msg.length) {
+	        packet = exports.decodePacket(msg, binaryType, true);
+	
+	        if (err.type == packet.type && err.data == packet.data) {
+	          // parser error in individual packet - ignoring payload
+	          return callback(err, 0, 1);
+	        }
+	
+	        var ret = callback(packet, i + n, l);
+	        if (false === ret) return;
+	      }
+	
+	      // advance cursor
+	      i += n;
+	      length = '';
+	    }
+	  }
+	
+	  if (length != '') {
+	    // parser error - ignoring payload
+	    return callback(err, 0, 1);
+	  }
+	
+	};
+	
+	/**
+	 * Encodes multiple messages (payload) as binary.
+	 *
+	 * <1 = binary, 0 = string><number from 0-9><number from 0-9>[...]<number
+	 * 255><data>
+	 *
+	 * Example:
+	 * 1 3 255 1 2 3, if the binary contents are interpreted as 8 bit integers
+	 *
+	 * @param {Array} packets
+	 * @return {ArrayBuffer} encoded payload
+	 * @api private
+	 */
+	
+	exports.encodePayloadAsArrayBuffer = function(packets, callback) {
+	  if (!packets.length) {
+	    return callback(new ArrayBuffer(0));
+	  }
+	
+	  function encodeOne(packet, doneCallback) {
+	    exports.encodePacket(packet, true, true, function(data) {
+	      return doneCallback(null, data);
+	    });
+	  }
+	
+	  map(packets, encodeOne, function(err, encodedPackets) {
+	    var totalLength = encodedPackets.reduce(function(acc, p) {
+	      var len;
+	      if (typeof p === 'string'){
+	        len = p.length;
+	      } else {
+	        len = p.byteLength;
+	      }
+	      return acc + len.toString().length + len + 2; // string/binary identifier + separator = 2
+	    }, 0);
+	
+	    var resultArray = new Uint8Array(totalLength);
+	
+	    var bufferIndex = 0;
+	    encodedPackets.forEach(function(p) {
+	      var isString = typeof p === 'string';
+	      var ab = p;
+	      if (isString) {
+	        var view = new Uint8Array(p.length);
+	        for (var i = 0; i < p.length; i++) {
+	          view[i] = p.charCodeAt(i);
+	        }
+	        ab = view.buffer;
+	      }
+	
+	      if (isString) { // not true binary
+	        resultArray[bufferIndex++] = 0;
+	      } else { // true binary
+	        resultArray[bufferIndex++] = 1;
+	      }
+	
+	      var lenStr = ab.byteLength.toString();
+	      for (var i = 0; i < lenStr.length; i++) {
+	        resultArray[bufferIndex++] = parseInt(lenStr[i]);
+	      }
+	      resultArray[bufferIndex++] = 255;
+	
+	      var view = new Uint8Array(ab);
+	      for (var i = 0; i < view.length; i++) {
+	        resultArray[bufferIndex++] = view[i];
+	      }
+	    });
+	
+	    return callback(resultArray.buffer);
+	  });
+	};
+	
+	/**
+	 * Encode as Blob
+	 */
+	
+	exports.encodePayloadAsBlob = function(packets, callback) {
+	  function encodeOne(packet, doneCallback) {
+	    exports.encodePacket(packet, true, true, function(encoded) {
+	      var binaryIdentifier = new Uint8Array(1);
+	      binaryIdentifier[0] = 1;
+	      if (typeof encoded === 'string') {
+	        var view = new Uint8Array(encoded.length);
+	        for (var i = 0; i < encoded.length; i++) {
+	          view[i] = encoded.charCodeAt(i);
+	        }
+	        encoded = view.buffer;
+	        binaryIdentifier[0] = 0;
+	      }
+	
+	      var len = (encoded instanceof ArrayBuffer)
+	        ? encoded.byteLength
+	        : encoded.size;
+	
+	      var lenStr = len.toString();
+	      var lengthAry = new Uint8Array(lenStr.length + 1);
+	      for (var i = 0; i < lenStr.length; i++) {
+	        lengthAry[i] = parseInt(lenStr[i]);
+	      }
+	      lengthAry[lenStr.length] = 255;
+	
+	      if (Blob) {
+	        var blob = new Blob([binaryIdentifier.buffer, lengthAry.buffer, encoded]);
+	        doneCallback(null, blob);
+	      }
+	    });
+	  }
+	
+	  map(packets, encodeOne, function(err, results) {
+	    return callback(new Blob(results));
+	  });
+	};
+	
+	/*
+	 * Decodes data when a payload is maybe expected. Strings are decoded by
+	 * interpreting each byte as a key code for entries marked to start with 0. See
+	 * description of encodePayloadAsBinary
+	 *
+	 * @param {ArrayBuffer} data, callback method
+	 * @api public
+	 */
+	
+	exports.decodePayloadAsBinary = function (data, binaryType, callback) {
+	  if (typeof binaryType === 'function') {
+	    callback = binaryType;
+	    binaryType = null;
+	  }
+	
+	  var bufferTail = data;
+	  var buffers = [];
+	
+	  var numberTooLong = false;
+	  while (bufferTail.byteLength > 0) {
+	    var tailArray = new Uint8Array(bufferTail);
+	    var isString = tailArray[0] === 0;
+	    var msgLength = '';
+	
+	    for (var i = 1; ; i++) {
+	      if (tailArray[i] == 255) break;
+	
+	      if (msgLength.length > 310) {
+	        numberTooLong = true;
+	        break;
+	      }
+	
+	      msgLength += tailArray[i];
+	    }
+	
+	    if(numberTooLong) return callback(err, 0, 1);
+	
+	    bufferTail = sliceBuffer(bufferTail, 2 + msgLength.length);
+	    msgLength = parseInt(msgLength);
+	
+	    var msg = sliceBuffer(bufferTail, 0, msgLength);
+	    if (isString) {
+	      try {
+	        msg = String.fromCharCode.apply(null, new Uint8Array(msg));
+	      } catch (e) {
+	        // iPhone Safari doesn't let you apply to typed arrays
+	        var typed = new Uint8Array(msg);
+	        msg = '';
+	        for (var i = 0; i < typed.length; i++) {
+	          msg += String.fromCharCode(typed[i]);
+	        }
+	      }
+	    }
+	
+	    buffers.push(msg);
+	    bufferTail = sliceBuffer(bufferTail, msgLength);
+	  }
+	
+	  var total = buffers.length;
+	  buffers.forEach(function(buffer, i) {
+	    callback(exports.decodePacket(buffer, binaryType, true), i, total);
+	  });
+	};
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 195 */
+/***/ function(module, exports) {
+
+	
+	/**
+	 * Gets the keys for an object.
+	 *
+	 * @return {Array} keys
+	 * @api private
+	 */
+	
+	module.exports = Object.keys || function keys (obj){
+	  var arr = [];
+	  var has = Object.prototype.hasOwnProperty;
+	
+	  for (var i in obj) {
+	    if (has.call(obj, i)) {
+	      arr.push(i);
+	    }
+	  }
+	  return arr;
+	};
+
+
+/***/ },
+/* 196 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {
+	/*
+	 * Module requirements.
+	 */
+	
+	var isArray = __webpack_require__(197);
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = hasBinary;
+	
+	/**
+	 * Checks for binary data.
+	 *
+	 * Right now only Buffer and ArrayBuffer are supported..
+	 *
+	 * @param {Object} anything
+	 * @api public
+	 */
+	
+	function hasBinary(data) {
+	
+	  function _hasBinary(obj) {
+	    if (!obj) return false;
+	
+	    if ( (global.Buffer && global.Buffer.isBuffer(obj)) ||
+	         (global.ArrayBuffer && obj instanceof ArrayBuffer) ||
+	         (global.Blob && obj instanceof Blob) ||
+	         (global.File && obj instanceof File)
+	        ) {
+	      return true;
+	    }
+	
+	    if (isArray(obj)) {
+	      for (var i = 0; i < obj.length; i++) {
+	          if (_hasBinary(obj[i])) {
+	              return true;
+	          }
+	      }
+	    } else if (obj && 'object' == typeof obj) {
+	      if (obj.toJSON) {
+	        obj = obj.toJSON();
+	      }
+	
+	      for (var key in obj) {
+	        if (Object.prototype.hasOwnProperty.call(obj, key) && _hasBinary(obj[key])) {
+	          return true;
+	        }
+	      }
+	    }
+	
+	    return false;
+	  }
+	
+	  return _hasBinary(data);
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 197 */
+/***/ function(module, exports) {
+
+	module.exports = Array.isArray || function (arr) {
+	  return Object.prototype.toString.call(arr) == '[object Array]';
+	};
+
+
+/***/ },
+/* 198 */
+/***/ function(module, exports) {
+
+	/**
+	 * An abstraction for slicing an arraybuffer even when
+	 * ArrayBuffer.prototype.slice is not supported
+	 *
+	 * @api public
+	 */
+	
+	module.exports = function(arraybuffer, start, end) {
+	  var bytes = arraybuffer.byteLength;
+	  start = start || 0;
+	  end = end || bytes;
+	
+	  if (arraybuffer.slice) { return arraybuffer.slice(start, end); }
+	
+	  if (start < 0) { start += bytes; }
+	  if (end < 0) { end += bytes; }
+	  if (end > bytes) { end = bytes; }
+	
+	  if (start >= bytes || start >= end || bytes === 0) {
+	    return new ArrayBuffer(0);
+	  }
+	
+	  var abv = new Uint8Array(arraybuffer);
+	  var result = new Uint8Array(end - start);
+	  for (var i = start, ii = 0; i < end; i++, ii++) {
+	    result[ii] = abv[i];
+	  }
+	  return result.buffer;
+	};
+
+
+/***/ },
+/* 199 */
+/***/ function(module, exports) {
+
+	/*
+	 * base64-arraybuffer
+	 * https://github.com/niklasvh/base64-arraybuffer
+	 *
+	 * Copyright (c) 2012 Niklas von Hertzen
+	 * Licensed under the MIT license.
+	 */
+	(function(chars){
+	  "use strict";
+	
+	  exports.encode = function(arraybuffer) {
+	    var bytes = new Uint8Array(arraybuffer),
+	    i, len = bytes.length, base64 = "";
+	
+	    for (i = 0; i < len; i+=3) {
+	      base64 += chars[bytes[i] >> 2];
+	      base64 += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)];
+	      base64 += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)];
+	      base64 += chars[bytes[i + 2] & 63];
+	    }
+	
+	    if ((len % 3) === 2) {
+	      base64 = base64.substring(0, base64.length - 1) + "=";
+	    } else if (len % 3 === 1) {
+	      base64 = base64.substring(0, base64.length - 2) + "==";
+	    }
+	
+	    return base64;
+	  };
+	
+	  exports.decode =  function(base64) {
+	    var bufferLength = base64.length * 0.75,
+	    len = base64.length, i, p = 0,
+	    encoded1, encoded2, encoded3, encoded4;
+	
+	    if (base64[base64.length - 1] === "=") {
+	      bufferLength--;
+	      if (base64[base64.length - 2] === "=") {
+	        bufferLength--;
+	      }
+	    }
+	
+	    var arraybuffer = new ArrayBuffer(bufferLength),
+	    bytes = new Uint8Array(arraybuffer);
+	
+	    for (i = 0; i < len; i+=4) {
+	      encoded1 = chars.indexOf(base64[i]);
+	      encoded2 = chars.indexOf(base64[i+1]);
+	      encoded3 = chars.indexOf(base64[i+2]);
+	      encoded4 = chars.indexOf(base64[i+3]);
+	
+	      bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+	      bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+	      bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+	    }
+	
+	    return arraybuffer;
+	  };
+	})("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+
+
+/***/ },
+/* 200 */
+/***/ function(module, exports) {
+
+	module.exports = after
+	
+	function after(count, callback, err_cb) {
+	    var bail = false
+	    err_cb = err_cb || noop
+	    proxy.count = count
+	
+	    return (count === 0) ? callback() : proxy
+	
+	    function proxy(err, result) {
+	        if (proxy.count <= 0) {
+	            throw new Error('after called too many times')
+	        }
+	        --proxy.count
+	
+	        // after first error, rest are passed to err_cb
+	        if (err) {
+	            bail = true
+	            callback(err)
+	            // future error callbacks will go to error handler
+	            callback = err_cb
+	        } else if (proxy.count === 0 && !bail) {
+	            callback(null, result)
+	        }
+	    }
+	}
+	
+	function noop() {}
+
+
+/***/ },
+/* 201 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var __WEBPACK_AMD_DEFINE_RESULT__;/* WEBPACK VAR INJECTION */(function(module, global) {/*! https://mths.be/utf8js v2.0.0 by @mathias */
+	;(function(root) {
+	
+		// Detect free variables `exports`
+		var freeExports = typeof exports == 'object' && exports;
+	
+		// Detect free variable `module`
+		var freeModule = typeof module == 'object' && module &&
+			module.exports == freeExports && module;
+	
+		// Detect free variable `global`, from Node.js or Browserified code,
+		// and use it as `root`
+		var freeGlobal = typeof global == 'object' && global;
+		if (freeGlobal.global === freeGlobal || freeGlobal.window === freeGlobal) {
+			root = freeGlobal;
+		}
+	
+		/*--------------------------------------------------------------------------*/
+	
+		var stringFromCharCode = String.fromCharCode;
+	
+		// Taken from https://mths.be/punycode
+		function ucs2decode(string) {
+			var output = [];
+			var counter = 0;
+			var length = string.length;
+			var value;
+			var extra;
+			while (counter < length) {
+				value = string.charCodeAt(counter++);
+				if (value >= 0xD800 && value <= 0xDBFF && counter < length) {
+					// high surrogate, and there is a next character
+					extra = string.charCodeAt(counter++);
+					if ((extra & 0xFC00) == 0xDC00) { // low surrogate
+						output.push(((value & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000);
+					} else {
+						// unmatched surrogate; only append this code unit, in case the next
+						// code unit is the high surrogate of a surrogate pair
+						output.push(value);
+						counter--;
+					}
+				} else {
+					output.push(value);
+				}
+			}
+			return output;
+		}
+	
+		// Taken from https://mths.be/punycode
+		function ucs2encode(array) {
+			var length = array.length;
+			var index = -1;
+			var value;
+			var output = '';
+			while (++index < length) {
+				value = array[index];
+				if (value > 0xFFFF) {
+					value -= 0x10000;
+					output += stringFromCharCode(value >>> 10 & 0x3FF | 0xD800);
+					value = 0xDC00 | value & 0x3FF;
+				}
+				output += stringFromCharCode(value);
+			}
+			return output;
+		}
+	
+		function checkScalarValue(codePoint) {
+			if (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
+				throw Error(
+					'Lone surrogate U+' + codePoint.toString(16).toUpperCase() +
+					' is not a scalar value'
+				);
+			}
+		}
+		/*--------------------------------------------------------------------------*/
+	
+		function createByte(codePoint, shift) {
+			return stringFromCharCode(((codePoint >> shift) & 0x3F) | 0x80);
+		}
+	
+		function encodeCodePoint(codePoint) {
+			if ((codePoint & 0xFFFFFF80) == 0) { // 1-byte sequence
+				return stringFromCharCode(codePoint);
+			}
+			var symbol = '';
+			if ((codePoint & 0xFFFFF800) == 0) { // 2-byte sequence
+				symbol = stringFromCharCode(((codePoint >> 6) & 0x1F) | 0xC0);
+			}
+			else if ((codePoint & 0xFFFF0000) == 0) { // 3-byte sequence
+				checkScalarValue(codePoint);
+				symbol = stringFromCharCode(((codePoint >> 12) & 0x0F) | 0xE0);
+				symbol += createByte(codePoint, 6);
+			}
+			else if ((codePoint & 0xFFE00000) == 0) { // 4-byte sequence
+				symbol = stringFromCharCode(((codePoint >> 18) & 0x07) | 0xF0);
+				symbol += createByte(codePoint, 12);
+				symbol += createByte(codePoint, 6);
+			}
+			symbol += stringFromCharCode((codePoint & 0x3F) | 0x80);
+			return symbol;
+		}
+	
+		function utf8encode(string) {
+			var codePoints = ucs2decode(string);
+			var length = codePoints.length;
+			var index = -1;
+			var codePoint;
+			var byteString = '';
+			while (++index < length) {
+				codePoint = codePoints[index];
+				byteString += encodeCodePoint(codePoint);
+			}
+			return byteString;
+		}
+	
+		/*--------------------------------------------------------------------------*/
+	
+		function readContinuationByte() {
+			if (byteIndex >= byteCount) {
+				throw Error('Invalid byte index');
+			}
+	
+			var continuationByte = byteArray[byteIndex] & 0xFF;
+			byteIndex++;
+	
+			if ((continuationByte & 0xC0) == 0x80) {
+				return continuationByte & 0x3F;
+			}
+	
+			// If we end up here, it’s not a continuation byte
+			throw Error('Invalid continuation byte');
+		}
+	
+		function decodeSymbol() {
+			var byte1;
+			var byte2;
+			var byte3;
+			var byte4;
+			var codePoint;
+	
+			if (byteIndex > byteCount) {
+				throw Error('Invalid byte index');
+			}
+	
+			if (byteIndex == byteCount) {
+				return false;
+			}
+	
+			// Read first byte
+			byte1 = byteArray[byteIndex] & 0xFF;
+			byteIndex++;
+	
+			// 1-byte sequence (no continuation bytes)
+			if ((byte1 & 0x80) == 0) {
+				return byte1;
+			}
+	
+			// 2-byte sequence
+			if ((byte1 & 0xE0) == 0xC0) {
+				var byte2 = readContinuationByte();
+				codePoint = ((byte1 & 0x1F) << 6) | byte2;
+				if (codePoint >= 0x80) {
+					return codePoint;
+				} else {
+					throw Error('Invalid continuation byte');
+				}
+			}
+	
+			// 3-byte sequence (may include unpaired surrogates)
+			if ((byte1 & 0xF0) == 0xE0) {
+				byte2 = readContinuationByte();
+				byte3 = readContinuationByte();
+				codePoint = ((byte1 & 0x0F) << 12) | (byte2 << 6) | byte3;
+				if (codePoint >= 0x0800) {
+					checkScalarValue(codePoint);
+					return codePoint;
+				} else {
+					throw Error('Invalid continuation byte');
+				}
+			}
+	
+			// 4-byte sequence
+			if ((byte1 & 0xF8) == 0xF0) {
+				byte2 = readContinuationByte();
+				byte3 = readContinuationByte();
+				byte4 = readContinuationByte();
+				codePoint = ((byte1 & 0x0F) << 0x12) | (byte2 << 0x0C) |
+					(byte3 << 0x06) | byte4;
+				if (codePoint >= 0x010000 && codePoint <= 0x10FFFF) {
+					return codePoint;
+				}
+			}
+	
+			throw Error('Invalid UTF-8 detected');
+		}
+	
+		var byteArray;
+		var byteCount;
+		var byteIndex;
+		function utf8decode(byteString) {
+			byteArray = ucs2decode(byteString);
+			byteCount = byteArray.length;
+			byteIndex = 0;
+			var codePoints = [];
+			var tmp;
+			while ((tmp = decodeSymbol()) !== false) {
+				codePoints.push(tmp);
+			}
+			return ucs2encode(codePoints);
+		}
+	
+		/*--------------------------------------------------------------------------*/
+	
+		var utf8 = {
+			'version': '2.0.0',
+			'encode': utf8encode,
+			'decode': utf8decode
+		};
+	
+		// Some AMD build optimizers, like r.js, check for specific condition patterns
+		// like the following:
+		if (
+			true
+		) {
+			!(__WEBPACK_AMD_DEFINE_RESULT__ = function() {
+				return utf8;
+			}.call(exports, __webpack_require__, exports, module), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+		}	else if (freeExports && !freeExports.nodeType) {
+			if (freeModule) { // in Node.js or RingoJS v0.8.0+
+				freeModule.exports = utf8;
+			} else { // in Narwhal or RingoJS v0.7.0-
+				var object = {};
+				var hasOwnProperty = object.hasOwnProperty;
+				for (var key in utf8) {
+					hasOwnProperty.call(utf8, key) && (freeExports[key] = utf8[key]);
+				}
+			}
+		} else { // in Rhino or a web browser
+			root.utf8 = utf8;
+		}
+	
+	}(this));
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(178)(module), (function() { return this; }())))
+
+/***/ },
+/* 202 */
+/***/ function(module, exports) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Create a blob builder even when vendor prefixes exist
+	 */
+	
+	var BlobBuilder = global.BlobBuilder
+	  || global.WebKitBlobBuilder
+	  || global.MSBlobBuilder
+	  || global.MozBlobBuilder;
+	
+	/**
+	 * Check if Blob constructor is supported
+	 */
+	
+	var blobSupported = (function() {
+	  try {
+	    var a = new Blob(['hi']);
+	    return a.size === 2;
+	  } catch(e) {
+	    return false;
+	  }
+	})();
+	
+	/**
+	 * Check if Blob constructor supports ArrayBufferViews
+	 * Fails in Safari 6, so we need to map to ArrayBuffers there.
+	 */
+	
+	var blobSupportsArrayBufferView = blobSupported && (function() {
+	  try {
+	    var b = new Blob([new Uint8Array([1,2])]);
+	    return b.size === 2;
+	  } catch(e) {
+	    return false;
+	  }
+	})();
+	
+	/**
+	 * Check if BlobBuilder is supported
+	 */
+	
+	var blobBuilderSupported = BlobBuilder
+	  && BlobBuilder.prototype.append
+	  && BlobBuilder.prototype.getBlob;
+	
+	/**
+	 * Helper function that maps ArrayBufferViews to ArrayBuffers
+	 * Used by BlobBuilder constructor and old browsers that didn't
+	 * support it in the Blob constructor.
+	 */
+	
+	function mapArrayBufferViews(ary) {
+	  for (var i = 0; i < ary.length; i++) {
+	    var chunk = ary[i];
+	    if (chunk.buffer instanceof ArrayBuffer) {
+	      var buf = chunk.buffer;
+	
+	      // if this is a subarray, make a copy so we only
+	      // include the subarray region from the underlying buffer
+	      if (chunk.byteLength !== buf.byteLength) {
+	        var copy = new Uint8Array(chunk.byteLength);
+	        copy.set(new Uint8Array(buf, chunk.byteOffset, chunk.byteLength));
+	        buf = copy.buffer;
+	      }
+	
+	      ary[i] = buf;
+	    }
+	  }
+	}
+	
+	function BlobBuilderConstructor(ary, options) {
+	  options = options || {};
+	
+	  var bb = new BlobBuilder();
+	  mapArrayBufferViews(ary);
+	
+	  for (var i = 0; i < ary.length; i++) {
+	    bb.append(ary[i]);
+	  }
+	
+	  return (options.type) ? bb.getBlob(options.type) : bb.getBlob();
+	};
+	
+	function BlobConstructor(ary, options) {
+	  mapArrayBufferViews(ary);
+	  return new Blob(ary, options || {});
+	};
+	
+	module.exports = (function() {
+	  if (blobSupported) {
+	    return blobSupportsArrayBufferView ? global.Blob : BlobConstructor;
+	  } else if (blobBuilderSupported) {
+	    return BlobBuilderConstructor;
+	  } else {
+	    return undefined;
+	  }
+	})();
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 203 */
+/***/ function(module, exports) {
+
+	/**
+	 * Compiles a querystring
+	 * Returns string representation of the object
+	 *
+	 * @param {Object}
+	 * @api private
+	 */
+	
+	exports.encode = function (obj) {
+	  var str = '';
+	
+	  for (var i in obj) {
+	    if (obj.hasOwnProperty(i)) {
+	      if (str.length) str += '&';
+	      str += encodeURIComponent(i) + '=' + encodeURIComponent(obj[i]);
+	    }
+	  }
+	
+	  return str;
+	};
+	
+	/**
+	 * Parses a simple querystring into an object
+	 *
+	 * @param {String} qs
+	 * @api private
+	 */
+	
+	exports.decode = function(qs){
+	  var qry = {};
+	  var pairs = qs.split('&');
+	  for (var i = 0, l = pairs.length; i < l; i++) {
+	    var pair = pairs[i].split('=');
+	    qry[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+	  }
+	  return qry;
+	};
+
+
+/***/ },
+/* 204 */
+/***/ function(module, exports) {
+
+	
+	module.exports = function(a, b){
+	  var fn = function(){};
+	  fn.prototype = b.prototype;
+	  a.prototype = new fn;
+	  a.prototype.constructor = a;
+	};
+
+/***/ },
+/* 205 */
+/***/ function(module, exports) {
+
+	'use strict';
+	
+	var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.split('')
+	  , length = 64
+	  , map = {}
+	  , seed = 0
+	  , i = 0
+	  , prev;
+	
+	/**
+	 * Return a string representing the specified number.
+	 *
+	 * @param {Number} num The number to convert.
+	 * @returns {String} The string representation of the number.
+	 * @api public
+	 */
+	function encode(num) {
+	  var encoded = '';
+	
+	  do {
+	    encoded = alphabet[num % length] + encoded;
+	    num = Math.floor(num / length);
+	  } while (num > 0);
+	
+	  return encoded;
+	}
+	
+	/**
+	 * Return the integer value specified by the given string.
+	 *
+	 * @param {String} str The string to convert.
+	 * @returns {Number} The integer value represented by the string.
+	 * @api public
+	 */
+	function decode(str) {
+	  var decoded = 0;
+	
+	  for (i = 0; i < str.length; i++) {
+	    decoded = decoded * length + map[str.charAt(i)];
+	  }
+	
+	  return decoded;
+	}
+	
+	/**
+	 * Yeast: A tiny growing id generator.
+	 *
+	 * @returns {String} A unique id.
+	 * @api public
+	 */
+	function yeast() {
+	  var now = encode(+new Date());
+	
+	  if (now !== prev) return seed = 0, prev = now;
+	  return now +'.'+ encode(seed++);
+	}
+	
+	//
+	// Map each character to its index.
+	//
+	for (; i < length; i++) map[alphabet[i]] = i;
+	
+	//
+	// Expose the `yeast`, `encode` and `decode` functions.
+	//
+	yeast.encode = encode;
+	yeast.decode = decode;
+	module.exports = yeast;
+
+
+/***/ },
+/* 206 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {
+	/**
+	 * Module requirements.
+	 */
+	
+	var Polling = __webpack_require__(192);
+	var inherit = __webpack_require__(204);
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = JSONPPolling;
+	
+	/**
+	 * Cached regular expressions.
+	 */
+	
+	var rNewline = /\n/g;
+	var rEscapedNewline = /\\n/g;
+	
+	/**
+	 * Global JSONP callbacks.
+	 */
+	
+	var callbacks;
+	
+	/**
+	 * Callbacks count.
+	 */
+	
+	var index = 0;
+	
+	/**
+	 * Noop.
+	 */
+	
+	function empty () { }
+	
+	/**
+	 * JSONP Polling constructor.
+	 *
+	 * @param {Object} opts.
+	 * @api public
+	 */
+	
+	function JSONPPolling (opts) {
+	  Polling.call(this, opts);
+	
+	  this.query = this.query || {};
+	
+	  // define global callbacks array if not present
+	  // we do this here (lazily) to avoid unneeded global pollution
+	  if (!callbacks) {
+	    // we need to consider multiple engines in the same page
+	    if (!global.___eio) global.___eio = [];
+	    callbacks = global.___eio;
+	  }
+	
+	  // callback identifier
+	  this.index = callbacks.length;
+	
+	  // add callback to jsonp global
+	  var self = this;
+	  callbacks.push(function (msg) {
+	    self.onData(msg);
+	  });
+	
+	  // append to query string
+	  this.query.j = this.index;
+	
+	  // prevent spurious errors from being emitted when the window is unloaded
+	  if (global.document && global.addEventListener) {
+	    global.addEventListener('beforeunload', function () {
+	      if (self.script) self.script.onerror = empty;
+	    }, false);
+	  }
+	}
+	
+	/**
+	 * Inherits from Polling.
+	 */
+	
+	inherit(JSONPPolling, Polling);
+	
+	/*
+	 * JSONP only supports binary as base64 encoded strings
+	 */
+	
+	JSONPPolling.prototype.supportsBinary = false;
+	
+	/**
+	 * Closes the socket.
+	 *
+	 * @api private
+	 */
+	
+	JSONPPolling.prototype.doClose = function () {
+	  if (this.script) {
+	    this.script.parentNode.removeChild(this.script);
+	    this.script = null;
+	  }
+	
+	  if (this.form) {
+	    this.form.parentNode.removeChild(this.form);
+	    this.form = null;
+	    this.iframe = null;
+	  }
+	
+	  Polling.prototype.doClose.call(this);
+	};
+	
+	/**
+	 * Starts a poll cycle.
+	 *
+	 * @api private
+	 */
+	
+	JSONPPolling.prototype.doPoll = function () {
+	  var self = this;
+	  var script = document.createElement('script');
+	
+	  if (this.script) {
+	    this.script.parentNode.removeChild(this.script);
+	    this.script = null;
+	  }
+	
+	  script.async = true;
+	  script.src = this.uri();
+	  script.onerror = function(e){
+	    self.onError('jsonp poll error',e);
+	  };
+	
+	  var insertAt = document.getElementsByTagName('script')[0];
+	  if (insertAt) {
+	    insertAt.parentNode.insertBefore(script, insertAt);
+	  }
+	  else {
+	    (document.head || document.body).appendChild(script);
+	  }
+	  this.script = script;
+	
+	  var isUAgecko = 'undefined' != typeof navigator && /gecko/i.test(navigator.userAgent);
+	  
+	  if (isUAgecko) {
+	    setTimeout(function () {
+	      var iframe = document.createElement('iframe');
+	      document.body.appendChild(iframe);
+	      document.body.removeChild(iframe);
+	    }, 100);
+	  }
+	};
+	
+	/**
+	 * Writes with a hidden iframe.
+	 *
+	 * @param {String} data to send
+	 * @param {Function} called upon flush.
+	 * @api private
+	 */
+	
+	JSONPPolling.prototype.doWrite = function (data, fn) {
+	  var self = this;
+	
+	  if (!this.form) {
+	    var form = document.createElement('form');
+	    var area = document.createElement('textarea');
+	    var id = this.iframeId = 'eio_iframe_' + this.index;
+	    var iframe;
+	
+	    form.className = 'socketio';
+	    form.style.position = 'absolute';
+	    form.style.top = '-1000px';
+	    form.style.left = '-1000px';
+	    form.target = id;
+	    form.method = 'POST';
+	    form.setAttribute('accept-charset', 'utf-8');
+	    area.name = 'd';
+	    form.appendChild(area);
+	    document.body.appendChild(form);
+	
+	    this.form = form;
+	    this.area = area;
+	  }
+	
+	  this.form.action = this.uri();
+	
+	  function complete () {
+	    initIframe();
+	    fn();
+	  }
+	
+	  function initIframe () {
+	    if (self.iframe) {
+	      try {
+	        self.form.removeChild(self.iframe);
+	      } catch (e) {
+	        self.onError('jsonp polling iframe removal error', e);
+	      }
+	    }
+	
+	    try {
+	      // ie6 dynamic iframes with target="" support (thanks Chris Lambacher)
+	      var html = '<iframe src="javascript:0" name="'+ self.iframeId +'">';
+	      iframe = document.createElement(html);
+	    } catch (e) {
+	      iframe = document.createElement('iframe');
+	      iframe.name = self.iframeId;
+	      iframe.src = 'javascript:0';
+	    }
+	
+	    iframe.id = self.iframeId;
+	
+	    self.form.appendChild(iframe);
+	    self.iframe = iframe;
+	  }
+	
+	  initIframe();
+	
+	  // escape \n to prevent it from being converted into \r\n by some UAs
+	  // double escaping is required for escaped new lines because unescaping of new lines can be done safely on server-side
+	  data = data.replace(rEscapedNewline, '\\\n');
+	  this.area.value = data.replace(rNewline, '\\n');
+	
+	  try {
+	    this.form.submit();
+	  } catch(e) {}
+	
+	  if (this.iframe.attachEvent) {
+	    this.iframe.onreadystatechange = function(){
+	      if (self.iframe.readyState == 'complete') {
+	        complete();
+	      }
+	    };
+	  } else {
+	    this.iframe.onload = complete;
+	  }
+	};
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 207 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Module dependencies.
+	 */
+	
+	var Transport = __webpack_require__(193);
+	var parser = __webpack_require__(194);
+	var parseqs = __webpack_require__(203);
+	var inherit = __webpack_require__(204);
+	var yeast = __webpack_require__(205);
+	var debug = __webpack_require__(173)('engine.io-client:websocket');
+	var BrowserWebSocket = global.WebSocket || global.MozWebSocket;
+	
+	/**
+	 * Get either the `WebSocket` or `MozWebSocket` globals
+	 * in the browser or try to resolve WebSocket-compatible
+	 * interface exposed by `ws` for Node-like environment.
+	 */
+	
+	var WebSocket = BrowserWebSocket;
+	if (!WebSocket && typeof window === 'undefined') {
+	  try {
+	    WebSocket = __webpack_require__(208);
+	  } catch (e) { }
+	}
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = WS;
+	
+	/**
+	 * WebSocket transport constructor.
+	 *
+	 * @api {Object} connection options
+	 * @api public
+	 */
+	
+	function WS(opts){
+	  var forceBase64 = (opts && opts.forceBase64);
+	  if (forceBase64) {
+	    this.supportsBinary = false;
+	  }
+	  this.perMessageDeflate = opts.perMessageDeflate;
+	  Transport.call(this, opts);
+	}
+	
+	/**
+	 * Inherits from Transport.
+	 */
+	
+	inherit(WS, Transport);
+	
+	/**
+	 * Transport name.
+	 *
+	 * @api public
+	 */
+	
+	WS.prototype.name = 'websocket';
+	
+	/*
+	 * WebSockets support binary
+	 */
+	
+	WS.prototype.supportsBinary = true;
+	
+	/**
+	 * Opens socket.
+	 *
+	 * @api private
+	 */
+	
+	WS.prototype.doOpen = function(){
+	  if (!this.check()) {
+	    // let probe timeout
+	    return;
+	  }
+	
+	  var self = this;
+	  var uri = this.uri();
+	  var protocols = void(0);
+	  var opts = {
+	    agent: this.agent,
+	    perMessageDeflate: this.perMessageDeflate
+	  };
+	
+	  // SSL options for Node.js client
+	  opts.pfx = this.pfx;
+	  opts.key = this.key;
+	  opts.passphrase = this.passphrase;
+	  opts.cert = this.cert;
+	  opts.ca = this.ca;
+	  opts.ciphers = this.ciphers;
+	  opts.rejectUnauthorized = this.rejectUnauthorized;
+	  if (this.extraHeaders) {
+	    opts.headers = this.extraHeaders;
+	  }
+	
+	  this.ws = BrowserWebSocket ? new WebSocket(uri) : new WebSocket(uri, protocols, opts);
+	
+	  if (this.ws.binaryType === undefined) {
+	    this.supportsBinary = false;
+	  }
+	
+	  if (this.ws.supports && this.ws.supports.binary) {
+	    this.supportsBinary = true;
+	    this.ws.binaryType = 'buffer';
+	  } else {
+	    this.ws.binaryType = 'arraybuffer';
+	  }
+	
+	  this.addEventListeners();
+	};
+	
+	/**
+	 * Adds event listeners to the socket
+	 *
+	 * @api private
+	 */
+	
+	WS.prototype.addEventListeners = function(){
+	  var self = this;
+	
+	  this.ws.onopen = function(){
+	    self.onOpen();
+	  };
+	  this.ws.onclose = function(){
+	    self.onClose();
+	  };
+	  this.ws.onmessage = function(ev){
+	    self.onData(ev.data);
+	  };
+	  this.ws.onerror = function(e){
+	    self.onError('websocket error', e);
+	  };
+	};
+	
+	/**
+	 * Override `onData` to use a timer on iOS.
+	 * See: https://gist.github.com/mloughran/2052006
+	 *
+	 * @api private
+	 */
+	
+	if ('undefined' != typeof navigator
+	  && /iPad|iPhone|iPod/i.test(navigator.userAgent)) {
+	  WS.prototype.onData = function(data){
+	    var self = this;
+	    setTimeout(function(){
+	      Transport.prototype.onData.call(self, data);
+	    }, 0);
+	  };
+	}
+	
+	/**
+	 * Writes data to socket.
+	 *
+	 * @param {Array} array of packets.
+	 * @api private
+	 */
+	
+	WS.prototype.write = function(packets){
+	  var self = this;
+	  this.writable = false;
+	
+	  // encodePacket efficient as it uses WS framing
+	  // no need for encodePayload
+	  var total = packets.length;
+	  for (var i = 0, l = total; i < l; i++) {
+	    (function(packet) {
+	      parser.encodePacket(packet, self.supportsBinary, function(data) {
+	        if (!BrowserWebSocket) {
+	          // always create a new object (GH-437)
+	          var opts = {};
+	          if (packet.options) {
+	            opts.compress = packet.options.compress;
+	          }
+	
+	          if (self.perMessageDeflate) {
+	            var len = 'string' == typeof data ? global.Buffer.byteLength(data) : data.length;
+	            if (len < self.perMessageDeflate.threshold) {
+	              opts.compress = false;
+	            }
+	          }
+	        }
+	
+	        //Sometimes the websocket has already been closed but the browser didn't
+	        //have a chance of informing us about it yet, in that case send will
+	        //throw an error
+	        try {
+	          if (BrowserWebSocket) {
+	            // TypeError is thrown when passing the second argument on Safari
+	            self.ws.send(data);
+	          } else {
+	            self.ws.send(data, opts);
+	          }
+	        } catch (e){
+	          debug('websocket closed before onclose event');
+	        }
+	
+	        --total || done();
+	      });
+	    })(packets[i]);
+	  }
+	
+	  function done(){
+	    self.emit('flush');
+	
+	    // fake drain
+	    // defer to next tick to allow Socket to clear writeBuffer
+	    setTimeout(function(){
+	      self.writable = true;
+	      self.emit('drain');
+	    }, 0);
+	  }
+	};
+	
+	/**
+	 * Called upon close
+	 *
+	 * @api private
+	 */
+	
+	WS.prototype.onClose = function(){
+	  Transport.prototype.onClose.call(this);
+	};
+	
+	/**
+	 * Closes socket.
+	 *
+	 * @api private
+	 */
+	
+	WS.prototype.doClose = function(){
+	  if (typeof this.ws !== 'undefined') {
+	    this.ws.close();
+	  }
+	};
+	
+	/**
+	 * Generates uri for connection.
+	 *
+	 * @api private
+	 */
+	
+	WS.prototype.uri = function(){
+	  var query = this.query || {};
+	  var schema = this.secure ? 'wss' : 'ws';
+	  var port = '';
+	
+	  // avoid port if default for schema
+	  if (this.port && (('wss' == schema && this.port != 443)
+	    || ('ws' == schema && this.port != 80))) {
+	    port = ':' + this.port;
+	  }
+	
+	  // append timestamp to URI
+	  if (this.timestampRequests) {
+	    query[this.timestampParam] = yeast();
+	  }
+	
+	  // communicate binary support capabilities
+	  if (!this.supportsBinary) {
+	    query.b64 = 1;
+	  }
+	
+	  query = parseqs.encode(query);
+	
+	  // prepend ? to query
+	  if (query.length) {
+	    query = '?' + query;
+	  }
+	
+	  var ipv6 = this.hostname.indexOf(':') !== -1;
+	  return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
+	};
+	
+	/**
+	 * Feature detection for WebSocket.
+	 *
+	 * @return {Boolean} whether this transport is available.
+	 * @api public
+	 */
+	
+	WS.prototype.check = function(){
+	  return !!WebSocket && !('__initialize' in WebSocket && this.name === WS.prototype.name);
+	};
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 208 */
+/***/ function(module, exports) {
+
+	/* (ignored) */
+
+/***/ },
+/* 209 */
+/***/ function(module, exports) {
+
+	
+	var indexOf = [].indexOf;
+	
+	module.exports = function(arr, obj){
+	  if (indexOf) return arr.indexOf(obj);
+	  for (var i = 0; i < arr.length; ++i) {
+	    if (arr[i] === obj) return i;
+	  }
+	  return -1;
+	};
+
+/***/ },
+/* 210 */
+/***/ function(module, exports) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * JSON parse.
+	 *
+	 * @see Based on jQuery#parseJSON (MIT) and JSON2
+	 * @api private
+	 */
+	
+	var rvalidchars = /^[\],:{}\s]*$/;
+	var rvalidescape = /\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g;
+	var rvalidtokens = /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g;
+	var rvalidbraces = /(?:^|:|,)(?:\s*\[)+/g;
+	var rtrimLeft = /^\s+/;
+	var rtrimRight = /\s+$/;
+	
+	module.exports = function parsejson(data) {
+	  if ('string' != typeof data || !data) {
+	    return null;
+	  }
+	
+	  data = data.replace(rtrimLeft, '').replace(rtrimRight, '');
+	
+	  // Attempt to parse using the native JSON parser first
+	  if (global.JSON && JSON.parse) {
+	    return JSON.parse(data);
+	  }
+	
+	  if (rvalidchars.test(data.replace(rvalidescape, '@')
+	      .replace(rvalidtokens, ']')
+	      .replace(rvalidbraces, ''))) {
+	    return (new Function('return ' + data))();
+	  }
+	};
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 211 */
+/***/ function(module, exports, __webpack_require__) {
+
+	
+	/**
+	 * Module dependencies.
+	 */
+	
+	var parser = __webpack_require__(176);
+	var Emitter = __webpack_require__(212);
+	var toArray = __webpack_require__(213);
+	var on = __webpack_require__(214);
+	var bind = __webpack_require__(215);
+	var debug = __webpack_require__(173)('socket.io-client:socket');
+	var hasBin = __webpack_require__(216);
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = exports = Socket;
+	
+	/**
+	 * Internal events (blacklisted).
+	 * These events can't be emitted by the user.
+	 *
+	 * @api private
+	 */
+	
+	var events = {
+	  connect: 1,
+	  connect_error: 1,
+	  connect_timeout: 1,
+	  connecting: 1,
+	  disconnect: 1,
+	  error: 1,
+	  reconnect: 1,
+	  reconnect_attempt: 1,
+	  reconnect_failed: 1,
+	  reconnect_error: 1,
+	  reconnecting: 1,
+	  ping: 1,
+	  pong: 1
+	};
+	
+	/**
+	 * Shortcut to `Emitter#emit`.
+	 */
+	
+	var emit = Emitter.prototype.emit;
+	
+	/**
+	 * `Socket` constructor.
+	 *
+	 * @api public
+	 */
+	
+	function Socket(io, nsp){
+	  this.io = io;
+	  this.nsp = nsp;
+	  this.json = this; // compat
+	  this.ids = 0;
+	  this.acks = {};
+	  this.receiveBuffer = [];
+	  this.sendBuffer = [];
+	  this.connected = false;
+	  this.disconnected = true;
+	  if (this.io.autoConnect) this.open();
+	}
+	
+	/**
+	 * Mix in `Emitter`.
+	 */
+	
+	Emitter(Socket.prototype);
+	
+	/**
+	 * Subscribe to open, close and packet events
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.subEvents = function() {
+	  if (this.subs) return;
+	
+	  var io = this.io;
+	  this.subs = [
+	    on(io, 'open', bind(this, 'onopen')),
+	    on(io, 'packet', bind(this, 'onpacket')),
+	    on(io, 'close', bind(this, 'onclose'))
+	  ];
+	};
+	
+	/**
+	 * "Opens" the socket.
+	 *
+	 * @api public
+	 */
+	
+	Socket.prototype.open =
+	Socket.prototype.connect = function(){
+	  if (this.connected) return this;
+	
+	  this.subEvents();
+	  this.io.open(); // ensure open
+	  if ('open' == this.io.readyState) this.onopen();
+	  this.emit('connecting');
+	  return this;
+	};
+	
+	/**
+	 * Sends a `message` event.
+	 *
+	 * @return {Socket} self
+	 * @api public
+	 */
+	
+	Socket.prototype.send = function(){
+	  var args = toArray(arguments);
+	  args.unshift('message');
+	  this.emit.apply(this, args);
+	  return this;
+	};
+	
+	/**
+	 * Override `emit`.
+	 * If the event is in `events`, it's emitted normally.
+	 *
+	 * @param {String} event name
+	 * @return {Socket} self
+	 * @api public
+	 */
+	
+	Socket.prototype.emit = function(ev){
+	  if (events.hasOwnProperty(ev)) {
+	    emit.apply(this, arguments);
+	    return this;
+	  }
+	
+	  var args = toArray(arguments);
+	  var parserType = parser.EVENT; // default
+	  if (hasBin(args)) { parserType = parser.BINARY_EVENT; } // binary
+	  var packet = { type: parserType, data: args };
+	
+	  packet.options = {};
+	  packet.options.compress = !this.flags || false !== this.flags.compress;
+	
+	  // event ack callback
+	  if ('function' == typeof args[args.length - 1]) {
+	    debug('emitting packet with ack id %d', this.ids);
+	    this.acks[this.ids] = args.pop();
+	    packet.id = this.ids++;
+	  }
+	
+	  if (this.connected) {
+	    this.packet(packet);
+	  } else {
+	    this.sendBuffer.push(packet);
+	  }
+	
+	  delete this.flags;
+	
+	  return this;
+	};
+	
+	/**
+	 * Sends a packet.
+	 *
+	 * @param {Object} packet
+	 * @api private
+	 */
+	
+	Socket.prototype.packet = function(packet){
+	  packet.nsp = this.nsp;
+	  this.io.packet(packet);
+	};
+	
+	/**
+	 * Called upon engine `open`.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onopen = function(){
+	  debug('transport is open - connecting');
+	
+	  // write connect packet if necessary
+	  if ('/' != this.nsp) {
+	    this.packet({ type: parser.CONNECT });
+	  }
+	};
+	
+	/**
+	 * Called upon engine `close`.
+	 *
+	 * @param {String} reason
+	 * @api private
+	 */
+	
+	Socket.prototype.onclose = function(reason){
+	  debug('close (%s)', reason);
+	  this.connected = false;
+	  this.disconnected = true;
+	  delete this.id;
+	  this.emit('disconnect', reason);
+	};
+	
+	/**
+	 * Called with socket packet.
+	 *
+	 * @param {Object} packet
+	 * @api private
+	 */
+	
+	Socket.prototype.onpacket = function(packet){
+	  if (packet.nsp != this.nsp) return;
+	
+	  switch (packet.type) {
+	    case parser.CONNECT:
+	      this.onconnect();
+	      break;
+	
+	    case parser.EVENT:
+	      this.onevent(packet);
+	      break;
+	
+	    case parser.BINARY_EVENT:
+	      this.onevent(packet);
+	      break;
+	
+	    case parser.ACK:
+	      this.onack(packet);
+	      break;
+	
+	    case parser.BINARY_ACK:
+	      this.onack(packet);
+	      break;
+	
+	    case parser.DISCONNECT:
+	      this.ondisconnect();
+	      break;
+	
+	    case parser.ERROR:
+	      this.emit('error', packet.data);
+	      break;
+	  }
+	};
+	
+	/**
+	 * Called upon a server event.
+	 *
+	 * @param {Object} packet
+	 * @api private
+	 */
+	
+	Socket.prototype.onevent = function(packet){
+	  var args = packet.data || [];
+	  debug('emitting event %j', args);
+	
+	  if (null != packet.id) {
+	    debug('attaching ack callback to event');
+	    args.push(this.ack(packet.id));
+	  }
+	
+	  if (this.connected) {
+	    emit.apply(this, args);
+	  } else {
+	    this.receiveBuffer.push(args);
+	  }
+	};
+	
+	/**
+	 * Produces an ack callback to emit with an event.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.ack = function(id){
+	  var self = this;
+	  var sent = false;
+	  return function(){
+	    // prevent double callbacks
+	    if (sent) return;
+	    sent = true;
+	    var args = toArray(arguments);
+	    debug('sending ack %j', args);
+	
+	    var type = hasBin(args) ? parser.BINARY_ACK : parser.ACK;
+	    self.packet({
+	      type: type,
+	      id: id,
+	      data: args
+	    });
+	  };
+	};
+	
+	/**
+	 * Called upon a server acknowlegement.
+	 *
+	 * @param {Object} packet
+	 * @api private
+	 */
+	
+	Socket.prototype.onack = function(packet){
+	  var ack = this.acks[packet.id];
+	  if ('function' == typeof ack) {
+	    debug('calling ack %s with %j', packet.id, packet.data);
+	    ack.apply(this, packet.data);
+	    delete this.acks[packet.id];
+	  } else {
+	    debug('bad ack %s', packet.id);
+	  }
+	};
+	
+	/**
+	 * Called upon server connect.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.onconnect = function(){
+	  this.connected = true;
+	  this.disconnected = false;
+	  this.emit('connect');
+	  this.emitBuffered();
+	};
+	
+	/**
+	 * Emit buffered events (received and emitted).
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.emitBuffered = function(){
+	  var i;
+	  for (i = 0; i < this.receiveBuffer.length; i++) {
+	    emit.apply(this, this.receiveBuffer[i]);
+	  }
+	  this.receiveBuffer = [];
+	
+	  for (i = 0; i < this.sendBuffer.length; i++) {
+	    this.packet(this.sendBuffer[i]);
+	  }
+	  this.sendBuffer = [];
+	};
+	
+	/**
+	 * Called upon server disconnect.
+	 *
+	 * @api private
+	 */
+	
+	Socket.prototype.ondisconnect = function(){
+	  debug('server disconnect (%s)', this.nsp);
+	  this.destroy();
+	  this.onclose('io server disconnect');
+	};
+	
+	/**
+	 * Called upon forced client/server side disconnections,
+	 * this method ensures the manager stops tracking us and
+	 * that reconnections don't get triggered for this.
+	 *
+	 * @api private.
+	 */
+	
+	Socket.prototype.destroy = function(){
+	  if (this.subs) {
+	    // clean subscriptions to avoid reconnections
+	    for (var i = 0; i < this.subs.length; i++) {
+	      this.subs[i].destroy();
+	    }
+	    this.subs = null;
+	  }
+	
+	  this.io.destroy(this);
+	};
+	
+	/**
+	 * Disconnects the socket manually.
+	 *
+	 * @return {Socket} self
+	 * @api public
+	 */
+	
+	Socket.prototype.close =
+	Socket.prototype.disconnect = function(){
+	  if (this.connected) {
+	    debug('performing disconnect (%s)', this.nsp);
+	    this.packet({ type: parser.DISCONNECT });
+	  }
+	
+	  // remove socket from pool
+	  this.destroy();
+	
+	  if (this.connected) {
+	    // fire events
+	    this.onclose('io client disconnect');
+	  }
+	  return this;
+	};
+	
+	/**
+	 * Sets the compress flag.
+	 *
+	 * @param {Boolean} if `true`, compresses the sending data
+	 * @return {Socket} self
+	 * @api public
+	 */
+	
+	Socket.prototype.compress = function(compress){
+	  this.flags = this.flags || {};
+	  this.flags.compress = compress;
+	  return this;
+	};
+
+
+/***/ },
+/* 212 */
+/***/ function(module, exports) {
+
+	
+	/**
+	 * Expose `Emitter`.
+	 */
+	
+	module.exports = Emitter;
+	
+	/**
+	 * Initialize a new `Emitter`.
+	 *
+	 * @api public
+	 */
+	
+	function Emitter(obj) {
+	  if (obj) return mixin(obj);
+	};
+	
+	/**
+	 * Mixin the emitter properties.
+	 *
+	 * @param {Object} obj
+	 * @return {Object}
+	 * @api private
+	 */
+	
+	function mixin(obj) {
+	  for (var key in Emitter.prototype) {
+	    obj[key] = Emitter.prototype[key];
+	  }
+	  return obj;
+	}
+	
+	/**
+	 * Listen on the given `event` with `fn`.
+	 *
+	 * @param {String} event
+	 * @param {Function} fn
+	 * @return {Emitter}
+	 * @api public
+	 */
+	
+	Emitter.prototype.on =
+	Emitter.prototype.addEventListener = function(event, fn){
+	  this._callbacks = this._callbacks || {};
+	  (this._callbacks['$' + event] = this._callbacks['$' + event] || [])
+	    .push(fn);
+	  return this;
+	};
+	
+	/**
+	 * Adds an `event` listener that will be invoked a single
+	 * time then automatically removed.
+	 *
+	 * @param {String} event
+	 * @param {Function} fn
+	 * @return {Emitter}
+	 * @api public
+	 */
+	
+	Emitter.prototype.once = function(event, fn){
+	  function on() {
+	    this.off(event, on);
+	    fn.apply(this, arguments);
+	  }
+	
+	  on.fn = fn;
+	  this.on(event, on);
+	  return this;
+	};
+	
+	/**
+	 * Remove the given callback for `event` or all
+	 * registered callbacks.
+	 *
+	 * @param {String} event
+	 * @param {Function} fn
+	 * @return {Emitter}
+	 * @api public
+	 */
+	
+	Emitter.prototype.off =
+	Emitter.prototype.removeListener =
+	Emitter.prototype.removeAllListeners =
+	Emitter.prototype.removeEventListener = function(event, fn){
+	  this._callbacks = this._callbacks || {};
+	
+	  // all
+	  if (0 == arguments.length) {
+	    this._callbacks = {};
+	    return this;
+	  }
+	
+	  // specific event
+	  var callbacks = this._callbacks['$' + event];
+	  if (!callbacks) return this;
+	
+	  // remove all handlers
+	  if (1 == arguments.length) {
+	    delete this._callbacks['$' + event];
+	    return this;
+	  }
+	
+	  // remove specific handler
+	  var cb;
+	  for (var i = 0; i < callbacks.length; i++) {
+	    cb = callbacks[i];
+	    if (cb === fn || cb.fn === fn) {
+	      callbacks.splice(i, 1);
+	      break;
+	    }
+	  }
+	  return this;
+	};
+	
+	/**
+	 * Emit `event` with the given args.
+	 *
+	 * @param {String} event
+	 * @param {Mixed} ...
+	 * @return {Emitter}
+	 */
+	
+	Emitter.prototype.emit = function(event){
+	  this._callbacks = this._callbacks || {};
+	  var args = [].slice.call(arguments, 1)
+	    , callbacks = this._callbacks['$' + event];
+	
+	  if (callbacks) {
+	    callbacks = callbacks.slice(0);
+	    for (var i = 0, len = callbacks.length; i < len; ++i) {
+	      callbacks[i].apply(this, args);
+	    }
+	  }
+	
+	  return this;
+	};
+	
+	/**
+	 * Return array of callbacks for `event`.
+	 *
+	 * @param {String} event
+	 * @return {Array}
+	 * @api public
+	 */
+	
+	Emitter.prototype.listeners = function(event){
+	  this._callbacks = this._callbacks || {};
+	  return this._callbacks['$' + event] || [];
+	};
+	
+	/**
+	 * Check if this emitter has `event` handlers.
+	 *
+	 * @param {String} event
+	 * @return {Boolean}
+	 * @api public
+	 */
+	
+	Emitter.prototype.hasListeners = function(event){
+	  return !! this.listeners(event).length;
+	};
+
+
+/***/ },
+/* 213 */
+/***/ function(module, exports) {
+
+	module.exports = toArray
+	
+	function toArray(list, index) {
+	    var array = []
+	
+	    index = index || 0
+	
+	    for (var i = index || 0; i < list.length; i++) {
+	        array[i - index] = list[i]
+	    }
+	
+	    return array
+	}
+
+
+/***/ },
+/* 214 */
+/***/ function(module, exports) {
+
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = on;
+	
+	/**
+	 * Helper for subscriptions.
+	 *
+	 * @param {Object|EventEmitter} obj with `Emitter` mixin or `EventEmitter`
+	 * @param {String} event name
+	 * @param {Function} callback
+	 * @api public
+	 */
+	
+	function on(obj, ev, fn) {
+	  obj.on(ev, fn);
+	  return {
+	    destroy: function(){
+	      obj.removeListener(ev, fn);
+	    }
+	  };
+	}
+
+
+/***/ },
+/* 215 */
+/***/ function(module, exports) {
+
+	/**
+	 * Slice reference.
+	 */
+	
+	var slice = [].slice;
+	
+	/**
+	 * Bind `obj` to `fn`.
+	 *
+	 * @param {Object} obj
+	 * @param {Function|String} fn or string
+	 * @return {Function}
+	 * @api public
+	 */
+	
+	module.exports = function(obj, fn){
+	  if ('string' == typeof fn) fn = obj[fn];
+	  if ('function' != typeof fn) throw new Error('bind() requires a function');
+	  var args = slice.call(arguments, 2);
+	  return function(){
+	    return fn.apply(obj, args.concat(slice.call(arguments)));
+	  }
+	};
+
+
+/***/ },
+/* 216 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {
+	/*
+	 * Module requirements.
+	 */
+	
+	var isArray = __webpack_require__(217);
+	
+	/**
+	 * Module exports.
+	 */
+	
+	module.exports = hasBinary;
+	
+	/**
+	 * Checks for binary data.
+	 *
+	 * Right now only Buffer and ArrayBuffer are supported..
+	 *
+	 * @param {Object} anything
+	 * @api public
+	 */
+	
+	function hasBinary(data) {
+	
+	  function _hasBinary(obj) {
+	    if (!obj) return false;
+	
+	    if ( (global.Buffer && global.Buffer.isBuffer && global.Buffer.isBuffer(obj)) ||
+	         (global.ArrayBuffer && obj instanceof ArrayBuffer) ||
+	         (global.Blob && obj instanceof Blob) ||
+	         (global.File && obj instanceof File)
+	        ) {
+	      return true;
+	    }
+	
+	    if (isArray(obj)) {
+	      for (var i = 0; i < obj.length; i++) {
+	          if (_hasBinary(obj[i])) {
+	              return true;
+	          }
+	      }
+	    } else if (obj && 'object' == typeof obj) {
+	      // see: https://github.com/Automattic/has-binary/pull/4
+	      if (obj.toJSON && 'function' == typeof obj.toJSON) {
+	        obj = obj.toJSON();
+	      }
+	
+	      for (var key in obj) {
+	        if (Object.prototype.hasOwnProperty.call(obj, key) && _hasBinary(obj[key])) {
+	          return true;
+	        }
+	      }
+	    }
+	
+	    return false;
+	  }
+	
+	  return _hasBinary(data);
+	}
+	
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 217 */
+/***/ function(module, exports) {
+
+	module.exports = Array.isArray || function (arr) {
+	  return Object.prototype.toString.call(arr) == '[object Array]';
+	};
+
+
+/***/ },
+/* 218 */
+/***/ function(module, exports) {
+
+	
+	/**
+	 * Expose `Backoff`.
+	 */
+	
+	module.exports = Backoff;
+	
+	/**
+	 * Initialize backoff timer with `opts`.
+	 *
+	 * - `min` initial timeout in milliseconds [100]
+	 * - `max` max timeout [10000]
+	 * - `jitter` [0]
+	 * - `factor` [2]
+	 *
+	 * @param {Object} opts
+	 * @api public
+	 */
+	
+	function Backoff(opts) {
+	  opts = opts || {};
+	  this.ms = opts.min || 100;
+	  this.max = opts.max || 10000;
+	  this.factor = opts.factor || 2;
+	  this.jitter = opts.jitter > 0 && opts.jitter <= 1 ? opts.jitter : 0;
+	  this.attempts = 0;
+	}
+	
+	/**
+	 * Return the backoff duration.
+	 *
+	 * @return {Number}
+	 * @api public
+	 */
+	
+	Backoff.prototype.duration = function(){
+	  var ms = this.ms * Math.pow(this.factor, this.attempts++);
+	  if (this.jitter) {
+	    var rand =  Math.random();
+	    var deviation = Math.floor(rand * this.jitter * ms);
+	    ms = (Math.floor(rand * 10) & 1) == 0  ? ms - deviation : ms + deviation;
+	  }
+	  return Math.min(ms, this.max) | 0;
+	};
+	
+	/**
+	 * Reset the number of attempts.
+	 *
+	 * @api public
+	 */
+	
+	Backoff.prototype.reset = function(){
+	  this.attempts = 0;
+	};
+	
+	/**
+	 * Set the minimum duration
+	 *
+	 * @api public
+	 */
+	
+	Backoff.prototype.setMin = function(min){
+	  this.ms = min;
+	};
+	
+	/**
+	 * Set the maximum duration
+	 *
+	 * @api public
+	 */
+	
+	Backoff.prototype.setMax = function(max){
+	  this.max = max;
+	};
+	
+	/**
+	 * Set the jitter
+	 *
+	 * @api public
+	 */
+	
+	Backoff.prototype.setJitter = function(jitter){
+	  this.jitter = jitter;
+	};
+	
+
+
+/***/ },
+/* 219 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Baobab Data Structure
+	 * ======================
+	 *
+	 * A handy data tree with cursors.
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+	
+	var _get = function get(_x3, _x4, _x5) { var _again = true; _function: while (_again) { var object = _x3, property = _x4, receiver = _x5; _again = false; if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { _x3 = parent; _x4 = property; _x5 = receiver; _again = true; desc = parent = undefined; continue _function; } } else if ('value' in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } } };
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj['default'] = obj; return newObj; } }
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+	
+	function _inherits(subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+	
+	var _emmett = __webpack_require__(220);
+	
+	var _emmett2 = _interopRequireDefault(_emmett);
+	
+	var _cursor = __webpack_require__(221);
+	
+	var _cursor2 = _interopRequireDefault(_cursor);
+	
+	var _monkey = __webpack_require__(222);
+	
+	var _watcher = __webpack_require__(226);
+	
+	var _watcher2 = _interopRequireDefault(_watcher);
+	
+	var _type = __webpack_require__(223);
+	
+	var _type2 = _interopRequireDefault(_type);
+	
+	var _update2 = __webpack_require__(224);
+	
+	var _update3 = _interopRequireDefault(_update2);
+	
+	var _helpers = __webpack_require__(225);
+	
+	var helpers = _interopRequireWildcard(_helpers);
+	
+	var arrayFrom = helpers.arrayFrom;
+	var coercePath = helpers.coercePath;
+	var deepFreeze = helpers.deepFreeze;
+	var getIn = helpers.getIn;
+	var makeError = helpers.makeError;
+	var deepClone = helpers.deepClone;
+	var deepMerge = helpers.deepMerge;
+	var shallowClone = helpers.shallowClone;
+	var shallowMerge = helpers.shallowMerge;
+	var uniqid = helpers.uniqid;
+	
+	/**
+	 * Baobab defaults
+	 */
+	var DEFAULTS = {
+	
+	  // Should the tree handle its transactions on its own?
+	  autoCommit: true,
+	
+	  // Should the transactions be handled asynchronously?
+	  asynchronous: true,
+	
+	  // Should the tree's data be immutable?
+	  immutable: true,
+	
+	  // Should the monkeys be lazy?
+	  lazyMonkeys: true,
+	
+	  // Should the tree be persistent?
+	  persistent: true,
+	
+	  // Should the tree's update be pure?
+	  pure: true,
+	
+	  // Validation specifications
+	  validate: null,
+	
+	  // Validation behavior 'rollback' or 'notify'
+	  validationBehavior: 'rollback'
+	};
+	
+	/**
+	 * Function returning a string hash from a non-dynamic path expressed as an
+	 * array.
+	 *
+	 * @param  {array}  path - The path to hash.
+	 * @return {string} string - The resultant hash.
+	 */
+	function hashPath(path) {
+	  return 'λ' + path.map(function (step) {
+	    if (_type2['default']['function'](step) || _type2['default'].object(step)) return '#' + uniqid() + '#';
+	
+	    return step;
+	  }).join('λ');
+	}
+	
+	/**
+	 * Baobab class
+	 *
+	 * @constructor
+	 * @param {object|array} [initialData={}]    - Initial data passed to the tree.
+	 * @param {object}       [opts]              - Optional options.
+	 * @param {boolean}      [opts.autoCommit]   - Should the tree auto-commit?
+	 * @param {boolean}      [opts.asynchronous] - Should the tree's transactions
+	 *                                             handled asynchronously?
+	 * @param {boolean}      [opts.immutable]    - Should the tree be immutable?
+	 * @param {boolean}      [opts.persistent]   - Should the tree be persistent?
+	 * @param {boolean}      [opts.pure]         - Should the tree be pure?
+	 * @param {function}     [opts.validate]     - Validation function.
+	 * @param {string}       [opts.validationBehaviour] - "rollback" or "notify".
+	 */
+	
+	var Baobab = (function (_Emitter) {
+	  _inherits(Baobab, _Emitter);
+	
+	  function Baobab(initialData, opts) {
+	    var _this = this;
+	
+	    _classCallCheck(this, Baobab);
+	
+	    _get(Object.getPrototypeOf(Baobab.prototype), 'constructor', this).call(this);
+	
+	    // Setting initialData to an empty object if no data is provided by use
+	    if (arguments.length < 1) initialData = {};
+	
+	    // Checking whether given initial data is valid
+	    if (!_type2['default'].object(initialData) && !_type2['default'].array(initialData)) throw makeError('Baobab: invalid data.', { data: initialData });
+	
+	    // Merging given options with defaults
+	    this.options = shallowMerge({}, DEFAULTS, opts);
+	
+	    // Disabling immutability & persistence if persistence if disabled
+	    if (!this.options.persistent) {
+	      this.options.immutable = false;
+	      this.options.pure = false;
+	    }
+	
+	    // Privates
+	    this._identity = '[object Baobab]';
+	    this._cursors = {};
+	    this._future = null;
+	    this._transaction = [];
+	    this._affectedPathsIndex = {};
+	    this._monkeys = {};
+	    this._previousData = null;
+	    this._data = initialData;
+	
+	    // Properties
+	    this.root = new _cursor2['default'](this, [], 'λ');
+	    delete this.root.release;
+	
+	    // Does the user want an immutable tree?
+	    if (this.options.immutable) deepFreeze(this._data);
+	
+	    // Bootstrapping root cursor's getters and setters
+	    var bootstrap = function bootstrap(name) {
+	      _this[name] = function () {
+	        var r = this.root[name].apply(this.root, arguments);
+	        return r instanceof _cursor2['default'] ? this : r;
+	      };
+	    };
+	
+	    ['apply', 'clone', 'concat', 'deepClone', 'deepMerge', 'exists', 'get', 'push', 'merge', 'pop', 'project', 'serialize', 'set', 'shift', 'splice', 'unset', 'unshift'].forEach(bootstrap);
+	
+	    // Registering the initial monkeys
+	    this._refreshMonkeys();
+	
+	    // Initial validation
+	    var validationError = this.validate();
+	
+	    if (validationError) throw Error('Baobab: invalid data.', { error: validationError });
+	  }
+	
+	  /**
+	   * Monkey helper.
+	   */
+	
+	  /**
+	   * Internal method used to refresh the tree's monkey register on every
+	   * update.
+	   * Note 1) For the time being, placing monkeys beneath array nodes is not
+	   * allowed for performance reasons.
+	   *
+	   * @param  {mixed}   node      - The starting node.
+	   * @param  {array}   path      - The starting node's path.
+	   * @param  {string}  operation - The operation that lead to a refreshment.
+	   * @return {Baobab}            - The tree instance for chaining purposes.
+	   */
+	
+	  _createClass(Baobab, [{
+	    key: '_refreshMonkeys',
+	    value: function _refreshMonkeys(node, path, operation) {
+	      var _this2 = this;
+	
+	      var clean = function clean(data) {
+	        var p = arguments.length <= 1 || arguments[1] === undefined ? [] : arguments[1];
+	
+	        if (data instanceof _monkey.Monkey) {
+	          data.release();
+	          (0, _update3['default'])(_this2._monkeys, p, { type: 'unset' }, {
+	            immutable: false,
+	            persistent: false,
+	            pure: false
+	          });
+	
+	          return;
+	        }
+	
+	        if (_type2['default'].object(data)) {
+	          for (var k in data) {
+	            clean(data[k], p.concat(k));
+	          }
+	        }
+	      };
+	
+	      var walk = function walk(data) {
+	        var p = arguments.length <= 1 || arguments[1] === undefined ? [] : arguments[1];
+	
+	        // Should we sit a monkey in the tree?
+	        if (data instanceof _monkey.MonkeyDefinition || data instanceof _monkey.Monkey) {
+	          var monkeyInstance = new _monkey.Monkey(_this2, p, data instanceof _monkey.Monkey ? data.definition : data);
+	
+	          (0, _update3['default'])(_this2._monkeys, p, { type: 'set', value: monkeyInstance }, {
+	            immutable: false,
+	            persistent: false,
+	            pure: false
+	          });
+	
+	          return;
+	        }
+	
+	        // Object iteration
+	        if (_type2['default'].object(data)) {
+	          for (var k in data) {
+	            walk(data[k], p.concat(k));
+	          }
+	        }
+	      };
+	
+	      // Walking the whole tree
+	      if (!arguments.length) {
+	        walk(this._data);
+	      } else {
+	        var monkeysNode = getIn(this._monkeys, path).data;
+	
+	        // Is this required that we clean some already existing monkeys?
+	        if (monkeysNode) clean(monkeysNode, path);
+	
+	        // Let's walk the tree only from the updated point
+	        if (operation !== 'unset') {
+	          walk(node, path);
+	        }
+	      }
+	
+	      return this;
+	    }
+	
+	    /**
+	     * Method used to validate the tree's data.
+	     *
+	     * @return {boolean} - Is the tree valid?
+	     */
+	  }, {
+	    key: 'validate',
+	    value: function validate(affectedPaths) {
+	      var _options = this.options;
+	      var validate = _options.validate;
+	      var behavior = _options.validationBehavior;
+	
+	      if (typeof validate !== 'function') return null;
+	
+	      var error = validate.call(this, this._previousData, this._data, affectedPaths || [[]]);
+	
+	      if (error instanceof Error) {
+	
+	        if (behavior === 'rollback') {
+	          this._data = this._previousData;
+	          this._affectedPathsIndex = {};
+	          this._transaction = [];
+	          this._previousData = this._data;
+	        }
+	
+	        this.emit('invalid', { error: error });
+	
+	        return error;
+	      }
+	
+	      return null;
+	    }
+	
+	    /**
+	     * Method used to select data within the tree by creating a cursor. Cursors
+	     * are kept as singletons by the tree for performance and hygiene reasons.
+	     *
+	     * Arity (1):
+	     * @param {path}    path - Path to select in the tree.
+	     *
+	     * Arity (*):
+	     * @param {...step} path - Path to select in the tree.
+	     *
+	     * @return {Cursor}      - The resultant cursor.
+	     */
+	  }, {
+	    key: 'select',
+	    value: function select(path) {
+	
+	      // If no path is given, we simply return the root
+	      path = path || [];
+	
+	      // Variadic
+	      if (arguments.length > 1) path = arrayFrom(arguments);
+	
+	      // Checking that given path is valid
+	      if (!_type2['default'].path(path)) throw makeError('Baobab.select: invalid path.', { path: path });
+	
+	      // Casting to array
+	      path = [].concat(path);
+	
+	      // Computing hash (done here because it would be too late to do it in the
+	      // cursor's constructor since we need to hit the cursors' index first).
+	      var hash = hashPath(path);
+	
+	      // Creating a new cursor or returning the already existing one for the
+	      // requested path.
+	      var cursor = this._cursors[hash];
+	
+	      if (!cursor) {
+	        cursor = new _cursor2['default'](this, path, hash);
+	        this._cursors[hash] = cursor;
+	      }
+	
+	      // Emitting an event to notify that a part of the tree was selected
+	      this.emit('select', { path: path, cursor: cursor });
+	      return cursor;
+	    }
+	
+	    /**
+	     * Method used to update the tree. Updates are simply expressed by a path,
+	     * dynamic or not, and an operation.
+	     *
+	     * This is where path solving should happen and not in the cursor.
+	     *
+	     * @param  {path}   path      - The path where we'll apply the operation.
+	     * @param  {object} operation - The operation to apply.
+	     * @return {mixed} - Return the result of the update.
+	     */
+	  }, {
+	    key: 'update',
+	    value: function update(path, operation) {
+	      var _this3 = this;
+	
+	      // Coercing path
+	      path = coercePath(path);
+	
+	      if (!_type2['default'].operationType(operation.type)) throw makeError('Baobab.update: unknown operation type "' + operation.type + '".', { operation: operation });
+	
+	      // Solving the given path
+	
+	      var _getIn = getIn(this._data, path);
+	
+	      var solvedPath = _getIn.solvedPath;
+	      var exists = _getIn.exists;
+	
+	      // If we couldn't solve the path, we throw
+	      if (!solvedPath) throw makeError('Baobab.update: could not solve the given path.', {
+	        path: solvedPath
+	      });
+	
+	      // Read-only path?
+	      var monkeyPath = _type2['default'].monkeyPath(this._monkeys, solvedPath);
+	      if (monkeyPath && solvedPath.length > monkeyPath.length) throw makeError('Baobab.update: attempting to update a read-only path.', {
+	        path: solvedPath
+	      });
+	
+	      // We don't unset irrelevant paths
+	      if (operation.type === 'unset' && !exists) return;
+	
+	      // If we merge data, we need to acknowledge monkeys
+	      var realOperation = operation;
+	      if (/merge/i.test(operation.type)) {
+	        var monkeysNode = getIn(this._monkeys, solvedPath).data;
+	
+	        if (_type2['default'].object(monkeysNode)) {
+	
+	          // Cloning the operation not to create weird behavior for the user
+	          realOperation = shallowClone(realOperation);
+	
+	          // Fetching the existing node in the current data
+	          var currentNode = getIn(this._data, solvedPath).data;
+	
+	          if (/deep/i.test(realOperation.type)) realOperation.value = deepMerge({}, deepMerge({}, currentNode, deepClone(monkeysNode)), realOperation.value);else realOperation.value = shallowMerge({}, deepMerge({}, currentNode, deepClone(monkeysNode)), realOperation.value);
+	        }
+	      }
+	
+	      // Stashing previous data if this is the frame's first update
+	      if (!this._transaction.length) this._previousData = this._data;
+	
+	      // Applying the operation
+	      var result = (0, _update3['default'])(this._data, solvedPath, realOperation, this.options);
+	
+	      var data = result.data;
+	      var node = result.node;
+	
+	      // If because of purity, the update was moot, we stop here
+	      if (!('data' in result)) return node;
+	
+	      // If the operation is push, the affected path is slightly different
+	      var affectedPath = solvedPath.concat(operation.type === 'push' ? node.length - 1 : []);
+	
+	      var hash = hashPath(affectedPath);
+	
+	      // Updating data and transaction
+	      this._data = data;
+	      this._affectedPathsIndex[hash] = true;
+	      this._transaction.push(shallowMerge({}, operation, { path: affectedPath }));
+	
+	      // Updating the monkeys
+	      this._refreshMonkeys(node, solvedPath, operation.type);
+	
+	      // Emitting a `write` event
+	      this.emit('write', { path: affectedPath });
+	
+	      // Should we let the user commit?
+	      if (!this.options.autoCommit) return node;
+	
+	      // Should we update asynchronously?
+	      if (!this.options.asynchronous) {
+	        this.commit();
+	        return node;
+	      }
+	
+	      // Updating asynchronously
+	      if (!this._future) this._future = setTimeout(function () {
+	        return _this3.commit();
+	      }, 0);
+	
+	      // Finally returning the affected node
+	      return node;
+	    }
+	
+	    /**
+	     * Method committing the updates of the tree and firing the tree's events.
+	     *
+	     * @return {Baobab} - The tree instance for chaining purposes.
+	     */
+	  }, {
+	    key: 'commit',
+	    value: function commit() {
+	
+	      // Do not fire update if the transaction is empty
+	      if (!this._transaction.length) return this;
+	
+	      // Clearing timeout if one was defined
+	      if (this._future) this._future = clearTimeout(this._future);
+	
+	      var affectedPaths = Object.keys(this._affectedPathsIndex).map(function (h) {
+	        return h !== 'λ' ? h.split('λ').slice(1) : [];
+	      });
+	
+	      // Is the tree still valid?
+	      var validationError = this.validate(affectedPaths);
+	
+	      if (validationError) return this;
+	
+	      // Caching to keep original references before we change them
+	      var transaction = this._transaction,
+	          previousData = this._previousData;
+	
+	      this._affectedPathsIndex = {};
+	      this._transaction = [];
+	      this._previousData = this._data;
+	
+	      // Emitting update event
+	      this.emit('update', {
+	        paths: affectedPaths,
+	        currentData: this._data,
+	        transaction: transaction,
+	        previousData: previousData
+	      });
+	
+	      return this;
+	    }
+	
+	    /**
+	     * Method returning a monkey at the given path or else `null`.
+	     *
+	     * @param  {path}        path - Path of the monkey to retrieve.
+	     * @return {Monkey|null}      - The Monkey instance of `null`.
+	     */
+	  }, {
+	    key: 'getMonkey',
+	    value: function getMonkey(path) {
+	      path = coercePath(path);
+	
+	      var monkey = getIn(this._monkeys, [].concat(path)).data;
+	
+	      if (monkey instanceof _monkey.Monkey) return monkey;
+	
+	      return null;
+	    }
+	
+	    /**
+	     * Method used to watch a collection of paths within the tree. Very useful
+	     * to bind UI components and such to the tree.
+	     *
+	     * @param  {object} mapping - Mapping of paths to listen.
+	     * @return {Cursor}         - The created watcher.
+	     */
+	  }, {
+	    key: 'watch',
+	    value: function watch(mapping) {
+	      return new _watcher2['default'](this, mapping);
+	    }
+	
+	    /**
+	     * Method releasing the tree and its attached data from memory.
+	     */
+	  }, {
+	    key: 'release',
+	    value: function release() {
+	      var k = undefined;
+	
+	      this.emit('release');
+	
+	      delete this.root;
+	
+	      delete this._data;
+	      delete this._previousData;
+	      delete this._transaction;
+	      delete this._affectedPathsIndex;
+	      delete this._monkeys;
+	
+	      // Releasing cursors
+	      for (k in this._cursors) this._cursors[k].release();
+	      delete this._cursors;
+	
+	      // Killing event emitter
+	      this.kill();
+	    }
+	
+	    /**
+	     * Overriding the `toJSON` method for convenient use with JSON.stringify.
+	     *
+	     * @return {mixed} - Data at cursor.
+	     */
+	  }, {
+	    key: 'toJSON',
+	    value: function toJSON() {
+	      return this.serialize();
+	    }
+	
+	    /**
+	     * Overriding the `toString` method for debugging purposes.
+	     *
+	     * @return {string} - The baobab's identity.
+	     */
+	  }, {
+	    key: 'toString',
+	    value: function toString() {
+	      return this._identity;
+	    }
+	  }]);
+	
+	  return Baobab;
+	})(_emmett2['default']);
+	
+	exports['default'] = Baobab;
+	Baobab.monkey = function () {
+	  for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+	    args[_key] = arguments[_key];
+	  }
+	
+	  if (!args.length) throw new Error('Baobab.monkey: missing definition.');
+	
+	  if (args.length === 1 && typeof args[0] !== 'function') return new _monkey.MonkeyDefinition(args[0]);
+	
+	  return new _monkey.MonkeyDefinition(args);
+	};
+	Baobab.dynamicNode = Baobab.monkey;
+	
+	/**
+	 * Exposing some internals for convenience
+	 */
+	Baobab.Cursor = _cursor2['default'];
+	Baobab.MonkeyDefinition = _monkey.MonkeyDefinition;
+	Baobab.Monkey = _monkey.Monkey;
+	Baobab.type = _type2['default'];
+	Baobab.helpers = helpers;
+	
+	/**
+	 * Version
+	 */
+	Baobab.VERSION = '2.3.2';
+	module.exports = exports['default'];
+
+/***/ },
+/* 220 */
+/***/ function(module, exports, __webpack_require__) {
+
+	(function() {
+	  'use strict';
+	
+	  /**
+	   * Here is the list of every allowed parameter when using Emitter#on:
+	   * @type {Object}
+	   */
+	  var __allowedOptions = {
+	    once: 'boolean',
+	    scope: 'object'
+	  };
+	
+	  /**
+	   * Incremental id used to order event handlers.
+	   */
+	  var __order = 0;
+	
+	  /**
+	   * A simple helper to shallowly merge two objects. The second one will "win"
+	   * over the first one.
+	   *
+	   * @param  {object}  o1 First target object.
+	   * @param  {object}  o2 Second target object.
+	   * @return {object}     Returns the merged object.
+	   */
+	  function shallowMerge(o1, o2) {
+	    var o = {},
+	        k;
+	
+	    for (k in o1) o[k] = o1[k];
+	    for (k in o2) o[k] = o2[k];
+	
+	    return o;
+	  }
+	
+	  /**
+	   * Is the given variable a plain JavaScript object?
+	   *
+	   * @param  {mixed}  v   Target.
+	   * @return {boolean}    The boolean result.
+	   */
+	  function isPlainObject(v) {
+	    return v &&
+	           typeof v === 'object' &&
+	           !Array.isArray(v) &&
+	           !(v instanceof Function) &&
+	           !(v instanceof RegExp);
+	  }
+	
+	  /**
+	   * Iterate over an object that may have ES6 Symbols.
+	   *
+	   * @param  {object}   object  Object on which to iterate.
+	   * @param  {function} fn      Iterator function.
+	   * @param  {object}   [scope] Optional scope.
+	   */
+	  function forIn(object, fn, scope) {
+	    var symbols,
+	        k,
+	        i,
+	        l;
+	
+	    for (k in object)
+	      fn.call(scope || null, k, object[k]);
+	
+	    if (Object.getOwnPropertySymbols) {
+	      symbols = Object.getOwnPropertySymbols(object);
+	
+	      for (i = 0, l = symbols.length; i < l; i++)
+	        fn.call(scope || null, symbols[i], object[symbols[i]]);
+	    }
+	  }
+	
+	  /**
+	   * The emitter's constructor. It initializes the handlers-per-events store and
+	   * the global handlers store.
+	   *
+	   * Emitters are useful for non-DOM events communication. Read its methods
+	   * documentation for more information about how it works.
+	   *
+	   * @return {Emitter}         The fresh new instance.
+	   */
+	  var Emitter = function() {
+	    this._enabled = true;
+	
+	    // Dirty trick that will set the necessary properties to the emitter
+	    this.unbindAll();
+	  };
+	
+	  /**
+	   * This method unbinds every handlers attached to every or any events. So,
+	   * these functions will no more be executed when the related events are
+	   * emitted. If the functions were not bound to the events, nothing will
+	   * happen, and no error will be thrown.
+	   *
+	   * Usage:
+	   * ******
+	   * > myEmitter.unbindAll();
+	   *
+	   * @return {Emitter}      Returns this.
+	   */
+	  Emitter.prototype.unbindAll = function() {
+	
+	    this._handlers = {};
+	    this._handlersAll = [];
+	    this._handlersComplex = [];
+	
+	    return this;
+	  };
+	
+	
+	  /**
+	   * This method binds one or more functions to the emitter, handled to one or a
+	   * suite of events. So, these functions will be executed anytime one related
+	   * event is emitted.
+	   *
+	   * It is also possible to bind a function to any emitted event by not
+	   * specifying any event to bind the function to.
+	   *
+	   * Recognized options:
+	   * *******************
+	   *  - {?boolean} once   If true, the handlers will be unbound after the first
+	   *                      execution. Default value: false.
+	   *  - {?object}  scope  If a scope is given, then the listeners will be called
+	   *                      with this scope as "this".
+	   *
+	   * Variant 1:
+	   * **********
+	   * > myEmitter.on('myEvent', function(e) { console.log(e); });
+	   * > // Or:
+	   * > myEmitter.on('myEvent', function(e) { console.log(e); }, { once: true });
+	   *
+	   * @param  {string}   event   The event to listen to.
+	   * @param  {function} handler The function to bind.
+	   * @param  {?object}  options Eventually some options.
+	   * @return {Emitter}          Returns this.
+	   *
+	   * Variant 2:
+	   * **********
+	   * > myEmitter.on(
+	   * >   ['myEvent1', 'myEvent2'],
+	   * >   function(e) { console.log(e); }
+	   * >);
+	   * > // Or:
+	   * > myEmitter.on(
+	   * >   ['myEvent1', 'myEvent2'],
+	   * >   function(e) { console.log(e); }
+	   * >   { once: true }}
+	   * >);
+	   *
+	   * @param  {array}    events  The events to listen to.
+	   * @param  {function} handler The function to bind.
+	   * @param  {?object}  options Eventually some options.
+	   * @return {Emitter}          Returns this.
+	   *
+	   * Variant 3:
+	   * **********
+	   * > myEmitter.on({
+	   * >   myEvent1: function(e) { console.log(e); },
+	   * >   myEvent2: function(e) { console.log(e); }
+	   * > });
+	   * > // Or:
+	   * > myEmitter.on({
+	   * >   myEvent1: function(e) { console.log(e); },
+	   * >   myEvent2: function(e) { console.log(e); }
+	   * > }, { once: true });
+	   *
+	   * @param  {object}  bindings An object containing pairs event / function.
+	   * @param  {?object}  options Eventually some options.
+	   * @return {Emitter}          Returns this.
+	   *
+	   * Variant 4:
+	   * **********
+	   * > myEmitter.on(function(e) { console.log(e); });
+	   * > // Or:
+	   * > myEmitter.on(function(e) { console.log(e); }, { once: true});
+	   *
+	   * @param  {function} handler The function to bind to every events.
+	   * @param  {?object}  options Eventually some options.
+	   * @return {Emitter}          Returns this.
+	   */
+	  Emitter.prototype.on = function(a, b, c) {
+	    var i,
+	        l,
+	        k,
+	        event,
+	        eArray,
+	        handlersList,
+	        bindingObject;
+	
+	    // Variant 3
+	    if (isPlainObject(a)) {
+	      forIn(a, function(name, fn) {
+	        this.on(name, fn, b);
+	      }, this);
+	
+	      return this;
+	    }
+	
+	    // Variant 1, 2 and 4
+	    if (typeof a === 'function') {
+	      c = b;
+	      b = a;
+	      a = null;
+	    }
+	
+	    eArray = [].concat(a);
+	
+	    for (i = 0, l = eArray.length; i < l; i++) {
+	      event = eArray[i];
+	
+	      bindingObject = {
+	        order: __order++,
+	        fn: b
+	      };
+	
+	      // Defining the list in which the handler should be inserted
+	      if (typeof event === 'string' || typeof event === 'symbol') {
+	        if (!this._handlers[event])
+	          this._handlers[event] = [];
+	        handlersList = this._handlers[event];
+	        bindingObject.type = event;
+	      }
+	      else if (event instanceof RegExp) {
+	        handlersList = this._handlersComplex;
+	        bindingObject.pattern = event;
+	      }
+	      else if (event === null) {
+	        handlersList = this._handlersAll;
+	      }
+	      else {
+	        throw Error('Emitter.on: invalid event.');
+	      }
+	
+	      // Appending needed properties
+	      for (k in c || {})
+	        if (__allowedOptions[k])
+	          bindingObject[k] = c[k];
+	
+	      handlersList.push(bindingObject);
+	    }
+	
+	    return this;
+	  };
+	
+	
+	  /**
+	   * This method works exactly as the previous #on, but will add an options
+	   * object if none is given, and set the option "once" to true.
+	   *
+	   * The polymorphism works exactly as with the #on method.
+	   */
+	  Emitter.prototype.once = function() {
+	    var args = Array.prototype.slice.call(arguments),
+	        li = args.length - 1;
+	
+	    if (isPlainObject(args[li]) && args.length > 1)
+	      args[li] = shallowMerge(args[li], {once: true});
+	    else
+	      args.push({once: true});
+	
+	    return this.on.apply(this, args);
+	  };
+	
+	
+	  /**
+	   * This method unbinds one or more functions from events of the emitter. So,
+	   * these functions will no more be executed when the related events are
+	   * emitted. If the functions were not bound to the events, nothing will
+	   * happen, and no error will be thrown.
+	   *
+	   * Variant 1:
+	   * **********
+	   * > myEmitter.off('myEvent', myHandler);
+	   *
+	   * @param  {string}   event   The event to unbind the handler from.
+	   * @param  {function} handler The function to unbind.
+	   * @return {Emitter}          Returns this.
+	   *
+	   * Variant 2:
+	   * **********
+	   * > myEmitter.off(['myEvent1', 'myEvent2'], myHandler);
+	   *
+	   * @param  {array}    events  The events to unbind the handler from.
+	   * @param  {function} handler The function to unbind.
+	   * @return {Emitter}          Returns this.
+	   *
+	   * Variant 3:
+	   * **********
+	   * > myEmitter.off({
+	   * >   myEvent1: myHandler1,
+	   * >   myEvent2: myHandler2
+	   * > });
+	   *
+	   * @param  {object} bindings An object containing pairs event / function.
+	   * @return {Emitter}         Returns this.
+	   *
+	   * Variant 4:
+	   * **********
+	   * > myEmitter.off(myHandler);
+	   *
+	   * @param  {function} handler The function to unbind from every events.
+	   * @return {Emitter}          Returns this.
+	   *
+	   * Variant 5:
+	   * **********
+	   * > myEmitter.off(event);
+	   *
+	   * @param  {string} event     The event we should unbind.
+	   * @return {Emitter}          Returns this.
+	   */
+	  function filter(target, fn) {
+	    target = target || [];
+	
+	    var a = [],
+	        l,
+	        i;
+	
+	    for (i = 0, l = target.length; i < l; i++)
+	      if (target[i].fn !== fn)
+	        a.push(target[i]);
+	
+	    return a;
+	  }
+	
+	  Emitter.prototype.off = function(events, fn) {
+	    var i,
+	        n,
+	        k,
+	        event;
+	
+	    // Variant 4:
+	    if (arguments.length === 1 && typeof events === 'function') {
+	      fn = arguments[0];
+	
+	      // Handlers bound to events:
+	      for (k in this._handlers) {
+	        this._handlers[k] = filter(this._handlers[k], fn);
+	
+	        if (this._handlers[k].length === 0)
+	          delete this._handlers[k];
+	      }
+	
+	      // Generic Handlers
+	      this._handlersAll = filter(this._handlersAll, fn);
+	
+	      // Complex handlers
+	      this._handlersComplex = filter(this._handlersComplex, fn);
+	    }
+	
+	    // Variant 5
+	    else if (arguments.length === 1 &&
+	             (typeof events === 'string' || typeof events === 'symbol')) {
+	      delete this._handlers[events];
+	    }
+	
+	    // Variant 1 and 2:
+	    else if (arguments.length === 2) {
+	      var eArray = [].concat(events);
+	
+	      for (i = 0, n = eArray.length; i < n; i++) {
+	        event = eArray[i];
+	
+	        this._handlers[event] = filter(this._handlers[event], fn);
+	
+	        if ((this._handlers[event] || []).length === 0)
+	          delete this._handlers[event];
+	      }
+	    }
+	
+	    // Variant 3
+	    else if (isPlainObject(events)) {
+	      forIn(events, this.off, this);
+	    }
+	
+	    return this;
+	  };
+	
+	  /**
+	   * This method retrieve the listeners attached to a particular event.
+	   *
+	   * @param  {?string}    Name of the event.
+	   * @return {array}      Array of handler functions.
+	   */
+	  Emitter.prototype.listeners = function(event) {
+	    var handlers = this._handlersAll || [],
+	        complex = false,
+	        h,
+	        i,
+	        l;
+	
+	    if (!event)
+	      throw Error('Emitter.listeners: no event provided.');
+	
+	    handlers = handlers.concat(this._handlers[event] || []);
+	
+	    for (i = 0, l = this._handlersComplex.length; i < l; i++) {
+	      h = this._handlersComplex[i];
+	
+	      if (~event.search(h.pattern)) {
+	        complex = true;
+	        handlers.push(h);
+	      }
+	    }
+	
+	    // If we have any complex handlers, we need to sort
+	    if (this._handlersAll.length || complex)
+	      return handlers.sort(function(a, b) {
+	        return a.order - b.order;
+	      });
+	    else
+	      return handlers.slice(0);
+	  };
+	
+	  /**
+	   * This method emits the specified event(s), and executes every handlers bound
+	   * to the event(s).
+	   *
+	   * Use cases:
+	   * **********
+	   * > myEmitter.emit('myEvent');
+	   * > myEmitter.emit('myEvent', myData);
+	   * > myEmitter.emit(['myEvent1', 'myEvent2']);
+	   * > myEmitter.emit(['myEvent1', 'myEvent2'], myData);
+	   * > myEmitter.emit({myEvent1: myData1, myEvent2: myData2});
+	   *
+	   * @param  {string|array} events The event(s) to emit.
+	   * @param  {object?}      data   The data.
+	   * @return {Emitter}             Returns this.
+	   */
+	  Emitter.prototype.emit = function(events, data) {
+	
+	    // Short exit if the emitter is disabled
+	    if (!this._enabled)
+	      return this;
+	
+	    // Object variant
+	    if (isPlainObject(events)) {
+	      forIn(events, this.emit, this);
+	      return this;
+	    }
+	
+	    var eArray = [].concat(events),
+	        onces = [],
+	        event,
+	        parent,
+	        handlers,
+	        handler,
+	        i,
+	        j,
+	        l,
+	        m;
+	
+	    for (i = 0, l = eArray.length; i < l; i++) {
+	      handlers = this.listeners(eArray[i]);
+	
+	      for (j = 0, m = handlers.length; j < m; j++) {
+	        handler = handlers[j];
+	        event = {
+	          type: eArray[i],
+	          target: this
+	        };
+	
+	        if (arguments.length > 1)
+	          event.data = data;
+	
+	        handler.fn.call('scope' in handler ? handler.scope : this, event);
+	
+	        if (handler.once)
+	          onces.push(handler);
+	      }
+	
+	      // Cleaning onces
+	      for (j = onces.length - 1; j >= 0; j--) {
+	        parent = onces[j].type ?
+	          this._handlers[onces[j].type] :
+	          onces[j].pattern ?
+	            this._handlersComplex :
+	            this._handlersAll;
+	
+	        parent.splice(parent.indexOf(onces[j]), 1);
+	      }
+	    }
+	
+	    return this;
+	  };
+	
+	
+	  /**
+	   * This method will unbind all listeners and make it impossible to ever
+	   * rebind any listener to any event.
+	   */
+	  Emitter.prototype.kill = function() {
+	
+	    this.unbindAll();
+	    this._handlers = null;
+	    this._handlersAll = null;
+	    this._handlersComplex = null;
+	    this._enabled = false;
+	
+	    // Nooping methods
+	    this.unbindAll =
+	    this.on =
+	    this.once =
+	    this.off =
+	    this.emit =
+	    this.listeners = Function.prototype;
+	  };
+	
+	
+	  /**
+	   * This method disabled the emitter, which means its emit method will do
+	   * nothing.
+	   *
+	   * @return {Emitter} Returns this.
+	   */
+	  Emitter.prototype.disable = function() {
+	    this._enabled = false;
+	
+	    return this;
+	  };
+	
+	
+	  /**
+	   * This method enables the emitter.
+	   *
+	   * @return {Emitter} Returns this.
+	   */
+	  Emitter.prototype.enable = function() {
+	    this._enabled = true;
+	
+	    return this;
+	  };
+	
+	
+	  /**
+	   * Version:
+	   */
+	  Emitter.version = '3.1.1';
+	
+	
+	  // Export:
+	  if (true) {
+	    if (typeof module !== 'undefined' && module.exports)
+	      exports = module.exports = Emitter;
+	    exports.Emitter = Emitter;
+	  } else if (typeof define === 'function' && define.amd)
+	    define('emmett', [], function() {
+	      return Emitter;
+	    });
+	  else
+	    this.Emitter = Emitter;
+	}).call(this);
+
+
+/***/ },
+/* 221 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Baobab Cursors
+	 * ===============
+	 *
+	 * Cursors created by selecting some data within a Baobab tree.
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+	
+	var _get = function get(_x3, _x4, _x5) { var _again = true; _function: while (_again) { var object = _x3, property = _x4, receiver = _x5; _again = false; if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { _x3 = parent; _x4 = property; _x5 = receiver; _again = true; desc = parent = undefined; continue _function; } } else if ('value' in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } } };
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+	
+	function _inherits(subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+	
+	var _emmett = __webpack_require__(220);
+	
+	var _emmett2 = _interopRequireDefault(_emmett);
+	
+	var _monkey = __webpack_require__(222);
+	
+	var _type = __webpack_require__(223);
+	
+	var _type2 = _interopRequireDefault(_type);
+	
+	var _helpers = __webpack_require__(225);
+	
+	/**
+	 * Traversal helper function for dynamic cursors. Will throw a legible error
+	 * if traversal is not possible.
+	 *
+	 * @param {string} method     - The method name, to create a correct error msg.
+	 * @param {array}  solvedPath - The cursor's solved path.
+	 */
+	function checkPossibilityOfDynamicTraversal(method, solvedPath) {
+	  if (!solvedPath) throw (0, _helpers.makeError)('Baobab.Cursor.' + method + ': ' + ('cannot use ' + method + ' on an unresolved dynamic path.'), { path: solvedPath });
+	}
+	
+	/**
+	 * Cursor class
+	 *
+	 * @constructor
+	 * @param {Baobab} tree   - The cursor's root.
+	 * @param {array}  path   - The cursor's path in the tree.
+	 * @param {string} hash   - The path's hash computed ahead by the tree.
+	 */
+	
+	var Cursor = (function (_Emitter) {
+	  _inherits(Cursor, _Emitter);
+	
+	  function Cursor(tree, path, hash) {
+	    var _this = this;
+	
+	    _classCallCheck(this, Cursor);
+	
+	    _get(Object.getPrototypeOf(Cursor.prototype), 'constructor', this).call(this);
+	
+	    // If no path were to be provided, we fallback to an empty path (root)
+	    path = path || [];
+	
+	    // Privates
+	    this._identity = '[object Cursor]';
+	    this._archive = null;
+	
+	    // Properties
+	    this.tree = tree;
+	    this.path = path;
+	    this.hash = hash;
+	
+	    // State
+	    this.state = {
+	      killed: false,
+	      recording: false,
+	      undoing: false
+	    };
+	
+	    // Checking whether the given path is dynamic or not
+	    this._dynamicPath = _type2['default'].dynamicPath(this.path);
+	
+	    // Checking whether the given path will meet a monkey
+	    this._monkeyPath = _type2['default'].monkeyPath(this.tree._monkeys, this.path);
+	
+	    if (!this._dynamicPath) this.solvedPath = this.path;else this.solvedPath = (0, _helpers.getIn)(this.tree._data, this.path).solvedPath;
+	
+	    /**
+	     * Listener bound to the tree's writes so that cursors with dynamic paths
+	     * may update their solved path correctly.
+	     *
+	     * @param {object} event - The event fired by the tree.
+	     */
+	    this._writeHandler = function (_ref) {
+	      var data = _ref.data;
+	
+	      if (_this.state.killed || !(0, _helpers.solveUpdate)([data.path], _this._getComparedPaths())) return;
+	
+	      _this.solvedPath = (0, _helpers.getIn)(_this.tree._data, _this.path).solvedPath;
+	    };
+	
+	    /**
+	     * Function in charge of actually trigger the cursor's updates and
+	     * deal with the archived records.
+	     *
+	     * @note: probably should wrap the current solvedPath in closure to avoid
+	     * for tricky cases where it would fail.
+	     *
+	     * @param {mixed} previousData - the tree's previous data.
+	     */
+	    var fireUpdate = function fireUpdate(previousData) {
+	      var self = _this;
+	
+	      var eventData = Object.defineProperties({}, {
+	        previousData: {
+	          get: function get() {
+	            return (0, _helpers.getIn)(previousData, self.solvedPath).data;
+	          },
+	          configurable: true,
+	          enumerable: true
+	        },
+	        currentData: {
+	          get: function get() {
+	            return self.get();
+	          },
+	          configurable: true,
+	          enumerable: true
+	        }
+	      });
+	
+	      if (_this.state.recording && !_this.state.undoing) _this.archive.add(eventData.previousData);
+	
+	      _this.state.undoing = false;
+	
+	      return _this.emit('update', eventData);
+	    };
+	
+	    /**
+	     * Listener bound to the tree's updates and determining whether the
+	     * cursor is affected and should react accordingly.
+	     *
+	     * Note that this listener is lazily bound to the tree to be sure
+	     * one wouldn't leak listeners when only creating cursors for convenience
+	     * and not to listen to updates specifically.
+	     *
+	     * @param {object} event - The event fired by the tree.
+	     */
+	    this._updateHandler = function (event) {
+	      if (_this.state.killed) return;
+	
+	      var _event$data = event.data;
+	      var paths = _event$data.paths;
+	      var previousData = _event$data.previousData;
+	      var update = fireUpdate.bind(_this, previousData);
+	      var comparedPaths = _this._getComparedPaths();
+	
+	      if ((0, _helpers.solveUpdate)(paths, comparedPaths)) return update();
+	    };
+	
+	    // Lazy binding
+	    var bound = false;
+	    this._lazyBind = function () {
+	      if (bound) return;
+	
+	      bound = true;
+	
+	      if (_this._dynamicPath) _this.tree.on('write', _this._writeHandler);
+	
+	      return _this.tree.on('update', _this._updateHandler);
+	    };
+	
+	    // If the path is dynamic, we actually need to listen to the tree
+	    if (this._dynamicPath) {
+	      this._lazyBind();
+	    } else {
+	
+	      // Overriding the emitter `on` and `once` methods
+	      this.on = (0, _helpers.before)(this._lazyBind, this.on.bind(this));
+	      this.once = (0, _helpers.before)(this._lazyBind, this.once.bind(this));
+	    }
+	  }
+	
+	  /**
+	   * Method used to allow iterating over cursors containing list-type data.
+	   *
+	   * e.g. for(let i of cursor) { ... }
+	   *
+	   * @returns {object} -  Each item sequentially.
+	   */
+	
+	  /**
+	   * Internal helpers
+	   * -----------------
+	   */
+	
+	  /**
+	   * Method returning the paths of the tree watched over by the cursor and that
+	   * should be taken into account when solving a potential update.
+	   *
+	   * @return {array} - Array of paths to compare with a given update.
+	   */
+	
+	  _createClass(Cursor, [{
+	    key: '_getComparedPaths',
+	    value: function _getComparedPaths() {
+	
+	      // Checking whether we should keep track of some dependencies
+	      var additionalPaths = this._monkeyPath ? (0, _helpers.getIn)(this.tree._monkeys, this._monkeyPath).data.relatedPaths() : [];
+	
+	      return [this.solvedPath].concat(additionalPaths);
+	    }
+	
+	    /**
+	     * Predicates
+	     * -----------
+	     */
+	
+	    /**
+	     * Method returning whether the cursor is at root level.
+	     *
+	     * @return {boolean} - Is the cursor the root?
+	     */
+	  }, {
+	    key: 'isRoot',
+	    value: function isRoot() {
+	      return !this.path.length;
+	    }
+	
+	    /**
+	     * Method returning whether the cursor is at leaf level.
+	     *
+	     * @return {boolean} - Is the cursor a leaf?
+	     */
+	  }, {
+	    key: 'isLeaf',
+	    value: function isLeaf() {
+	      return _type2['default'].primitive(this._get().data);
+	    }
+	
+	    /**
+	     * Method returning whether the cursor is at branch level.
+	     *
+	     * @return {boolean} - Is the cursor a branch?
+	     */
+	  }, {
+	    key: 'isBranch',
+	    value: function isBranch() {
+	      return !this.isRoot() && !this.isLeaf();
+	    }
+	
+	    /**
+	     * Traversal Methods
+	     * ------------------
+	     */
+	
+	    /**
+	     * Method returning the root cursor.
+	     *
+	     * @return {Baobab} - The root cursor.
+	     */
+	  }, {
+	    key: 'root',
+	    value: function root() {
+	      return this.tree.select();
+	    }
+	
+	    /**
+	     * Method selecting a subpath as a new cursor.
+	     *
+	     * Arity (1):
+	     * @param  {path} path    - The path to select.
+	     *
+	     * Arity (*):
+	     * @param  {...step} path - The path to select.
+	     *
+	     * @return {Cursor}       - The created cursor.
+	     */
+	  }, {
+	    key: 'select',
+	    value: function select(path) {
+	      if (arguments.length > 1) path = (0, _helpers.arrayFrom)(arguments);
+	
+	      return this.tree.select(this.path.concat(path));
+	    }
+	
+	    /**
+	     * Method returning the parent node of the cursor or else `null` if the
+	     * cursor is already at root level.
+	     *
+	     * @return {Baobab} - The parent cursor.
+	     */
+	  }, {
+	    key: 'up',
+	    value: function up() {
+	      if (!this.isRoot()) return this.tree.select(this.path.slice(0, -1));
+	
+	      return null;
+	    }
+	
+	    /**
+	     * Method returning the child node of the cursor.
+	     *
+	     * @return {Baobab} - The child cursor.
+	     */
+	  }, {
+	    key: 'down',
+	    value: function down() {
+	      checkPossibilityOfDynamicTraversal('down', this.solvedPath);
+	
+	      if (!(this._get().data instanceof Array)) throw Error('Baobab.Cursor.down: cannot go down on a non-list type.');
+	
+	      return this.tree.select(this.solvedPath.concat(0));
+	    }
+	
+	    /**
+	     * Method returning the left sibling node of the cursor if this one is
+	     * pointing at a list. Returns `null` if this cursor is already leftmost.
+	     *
+	     * @return {Baobab} - The left sibling cursor.
+	     */
+	  }, {
+	    key: 'left',
+	    value: function left() {
+	      checkPossibilityOfDynamicTraversal('left', this.solvedPath);
+	
+	      var last = +this.solvedPath[this.solvedPath.length - 1];
+	
+	      if (isNaN(last)) throw Error('Baobab.Cursor.left: cannot go left on a non-list type.');
+	
+	      return last ? this.tree.select(this.solvedPath.slice(0, -1).concat(last - 1)) : null;
+	    }
+	
+	    /**
+	     * Method returning the right sibling node of the cursor if this one is
+	     * pointing at a list. Returns `null` if this cursor is already rightmost.
+	     *
+	     * @return {Baobab} - The right sibling cursor.
+	     */
+	  }, {
+	    key: 'right',
+	    value: function right() {
+	      checkPossibilityOfDynamicTraversal('right', this.solvedPath);
+	
+	      var last = +this.solvedPath[this.solvedPath.length - 1];
+	
+	      if (isNaN(last)) throw Error('Baobab.Cursor.right: cannot go right on a non-list type.');
+	
+	      if (last + 1 === this.up()._get().data.length) return null;
+	
+	      return this.tree.select(this.solvedPath.slice(0, -1).concat(last + 1));
+	    }
+	
+	    /**
+	     * Method returning the leftmost sibling node of the cursor if this one is
+	     * pointing at a list.
+	     *
+	     * @return {Baobab} - The leftmost sibling cursor.
+	     */
+	  }, {
+	    key: 'leftmost',
+	    value: function leftmost() {
+	      checkPossibilityOfDynamicTraversal('leftmost', this.solvedPath);
+	
+	      var last = +this.solvedPath[this.solvedPath.length - 1];
+	
+	      if (isNaN(last)) throw Error('Baobab.Cursor.leftmost: cannot go left on a non-list type.');
+	
+	      return this.tree.select(this.solvedPath.slice(0, -1).concat(0));
+	    }
+	
+	    /**
+	     * Method returning the rightmost sibling node of the cursor if this one is
+	     * pointing at a list.
+	     *
+	     * @return {Baobab} - The rightmost sibling cursor.
+	     */
+	  }, {
+	    key: 'rightmost',
+	    value: function rightmost() {
+	      checkPossibilityOfDynamicTraversal('rightmost', this.solvedPath);
+	
+	      var last = +this.solvedPath[this.solvedPath.length - 1];
+	
+	      if (isNaN(last)) throw Error('Baobab.Cursor.rightmost: cannot go right on a non-list type.');
+	
+	      var list = this.up()._get().data;
+	
+	      return this.tree.select(this.solvedPath.slice(0, -1).concat(list.length - 1));
+	    }
+	
+	    /**
+	     * Method mapping the children nodes of the cursor.
+	     *
+	     * @param  {function} fn      - The function to map.
+	     * @param  {object}   [scope] - An optional scope.
+	     * @return {array}            - The resultant array.
+	     */
+	  }, {
+	    key: 'map',
+	    value: function map(fn, scope) {
+	      checkPossibilityOfDynamicTraversal('map', this.solvedPath);
+	
+	      var array = this._get().data,
+	          l = arguments.length;
+	
+	      if (!_type2['default'].array(array)) throw Error('baobab.Cursor.map: cannot map a non-list type.');
+	
+	      return array.map(function (item, i) {
+	        return fn.call(l > 1 ? scope : this, this.select(i), i, array);
+	      }, this);
+	    }
+	
+	    /**
+	     * Getter Methods
+	     * ---------------
+	     */
+	
+	    /**
+	     * Internal get method. Basically contains the main body of the `get` method
+	     * without the event emitting. This is sometimes needed not to fire useless
+	     * events.
+	     *
+	     * @param  {path}   [path=[]]       - Path to get in the tree.
+	     * @return {object} info            - The resultant information.
+	     * @return {mixed}  info.data       - Data at path.
+	     * @return {array}  info.solvedPath - The path solved when getting.
+	     */
+	  }, {
+	    key: '_get',
+	    value: function _get() {
+	      var path = arguments.length <= 0 || arguments[0] === undefined ? [] : arguments[0];
+	
+	      if (!_type2['default'].path(path)) throw (0, _helpers.makeError)('Baobab.Cursor.getters: invalid path.', { path: path });
+	
+	      if (!this.solvedPath) return { data: undefined, solvedPath: null, exists: false };
+	
+	      return (0, _helpers.getIn)(this.tree._data, this.solvedPath.concat(path));
+	    }
+	
+	    /**
+	     * Method used to check whether a certain path exists in the tree starting
+	     * from the current cursor.
+	     *
+	     * Arity (1):
+	     * @param  {path}   path           - Path to check in the tree.
+	     *
+	     * Arity (2):
+	     * @param {..step}  path           - Path to check in the tree.
+	     *
+	     * @return {boolean}               - Does the given path exists?
+	     */
+	  }, {
+	    key: 'exists',
+	    value: function exists(path) {
+	      path = (0, _helpers.coercePath)(path);
+	
+	      if (arguments.length > 1) path = (0, _helpers.arrayFrom)(arguments);
+	
+	      return this._get(path).exists;
+	    }
+	
+	    /**
+	     * Method used to get data from the tree. Will fire a `get` event from the
+	     * tree so that the user may sometimes react upon it to fetch data, for
+	     * instance.
+	     *
+	     * Arity (1):
+	     * @param  {path}   path           - Path to get in the tree.
+	     *
+	     * Arity (2):
+	     * @param  {..step} path           - Path to get in the tree.
+	     *
+	     * @return {mixed}                 - Data at path.
+	     */
+	  }, {
+	    key: 'get',
+	    value: function get(path) {
+	      path = (0, _helpers.coercePath)(path);
+	
+	      if (arguments.length > 1) path = (0, _helpers.arrayFrom)(arguments);
+	
+	      var _get2 = this._get(path);
+	
+	      var data = _get2.data;
+	      var solvedPath = _get2.solvedPath;
+	
+	      // Emitting the event
+	      this.tree.emit('get', { data: data, solvedPath: solvedPath, path: this.path.concat(path) });
+	
+	      return data;
+	    }
+	
+	    /**
+	     * Method used to shallow clone data from the tree.
+	     *
+	     * Arity (1):
+	     * @param  {path}   path           - Path to get in the tree.
+	     *
+	     * Arity (2):
+	     * @param  {..step} path           - Path to get in the tree.
+	     *
+	     * @return {mixed}                 - Cloned data at path.
+	     */
+	  }, {
+	    key: 'clone',
+	    value: function clone() {
+	      var data = this.get.apply(this, arguments);
+	
+	      return (0, _helpers.shallowClone)(data);
+	    }
+	
+	    /**
+	     * Method used to deep clone data from the tree.
+	     *
+	     * Arity (1):
+	     * @param  {path}   path           - Path to get in the tree.
+	     *
+	     * Arity (2):
+	     * @param  {..step} path           - Path to get in the tree.
+	     *
+	     * @return {mixed}                 - Cloned data at path.
+	     */
+	  }, {
+	    key: 'deepClone',
+	    value: function deepClone() {
+	      var data = this.get.apply(this, arguments);
+	
+	      return (0, _helpers.deepClone)(data);
+	    }
+	
+	    /**
+	     * Method used to return raw data from the tree, by carefully avoiding
+	     * computed one.
+	     *
+	     * @todo: should be more performant as the cloning should happen as well as
+	     * when dropping computed data.
+	     *
+	     * Arity (1):
+	     * @param  {path}   path           - Path to serialize in the tree.
+	     *
+	     * Arity (2):
+	     * @param  {..step} path           - Path to serialize in the tree.
+	     *
+	     * @return {mixed}                 - The retrieved raw data.
+	     */
+	  }, {
+	    key: 'serialize',
+	    value: function serialize(path) {
+	      path = (0, _helpers.coercePath)(path);
+	
+	      if (arguments.length > 1) path = (0, _helpers.arrayFrom)(arguments);
+	
+	      if (!_type2['default'].path(path)) throw (0, _helpers.makeError)('Baobab.Cursor.getters: invalid path.', { path: path });
+	
+	      if (!this.solvedPath) return undefined;
+	
+	      var fullPath = this.solvedPath.concat(path);
+	
+	      var data = (0, _helpers.deepClone)((0, _helpers.getIn)(this.tree._data, fullPath).data),
+	          monkeys = (0, _helpers.getIn)(this.tree._monkeys, fullPath).data;
+	
+	      var dropComputedData = function dropComputedData(d, m) {
+	        if (!_type2['default'].object(m) || !_type2['default'].object(d)) return;
+	
+	        for (var k in m) {
+	          if (m[k] instanceof _monkey.Monkey) delete d[k];else dropComputedData(d[k], m[k]);
+	        }
+	      };
+	
+	      dropComputedData(data, monkeys);
+	      return data;
+	    }
+	
+	    /**
+	     * Method used to project some of the data at cursor onto a map or a list.
+	     *
+	     * @param  {object|array} projection - The projection's formal definition.
+	     * @return {object|array}            - The resultant map/list.
+	     */
+	  }, {
+	    key: 'project',
+	    value: function project(projection) {
+	      if (_type2['default'].object(projection)) {
+	        var data = {};
+	
+	        for (var k in projection) {
+	          data[k] = this.get(projection[k]);
+	        }return data;
+	      } else if (_type2['default'].array(projection)) {
+	        var data = [];
+	
+	        for (var i = 0, l = projection.length; i < l; i++) {
+	          data.push(this.get(projection[i]));
+	        }return data;
+	      }
+	
+	      throw (0, _helpers.makeError)('Baobab.Cursor.project: wrong projection.', { projection: projection });
+	    }
+	
+	    /**
+	     * History Methods
+	     * ----------------
+	     */
+	
+	    /**
+	     * Methods starting to record the cursor's successive states.
+	     *
+	     * @param  {integer} [maxRecords] - Maximum records to keep in memory. Note
+	     *                                  that if no number is provided, the cursor
+	     *                                  will keep everything.
+	     * @return {Cursor}               - The cursor instance for chaining purposes.
+	     */
+	  }, {
+	    key: 'startRecording',
+	    value: function startRecording(maxRecords) {
+	      maxRecords = maxRecords || Infinity;
+	
+	      if (maxRecords < 1) throw (0, _helpers.makeError)('Baobab.Cursor.startRecording: invalid max records.', {
+	        value: maxRecords
+	      });
+	
+	      this.state.recording = true;
+	
+	      if (this.archive) return this;
+	
+	      // Lazy binding
+	      this._lazyBind();
+	
+	      this.archive = new _helpers.Archive(maxRecords);
+	      return this;
+	    }
+	
+	    /**
+	     * Methods stopping to record the cursor's successive states.
+	     *
+	     * @return {Cursor} - The cursor instance for chaining purposes.
+	     */
+	  }, {
+	    key: 'stopRecording',
+	    value: function stopRecording() {
+	      this.state.recording = false;
+	      return this;
+	    }
+	
+	    /**
+	     * Methods undoing n steps of the cursor's recorded states.
+	     *
+	     * @param  {integer} [steps=1] - The number of steps to rollback.
+	     * @return {Cursor}            - The cursor instance for chaining purposes.
+	     */
+	  }, {
+	    key: 'undo',
+	    value: function undo() {
+	      var steps = arguments.length <= 0 || arguments[0] === undefined ? 1 : arguments[0];
+	
+	      if (!this.state.recording) throw new Error('Baobab.Cursor.undo: cursor is not recording.');
+	
+	      var record = this.archive.back(steps);
+	
+	      if (!record) throw Error('Baobab.Cursor.undo: cannot find a relevant record.');
+	
+	      this.state.undoing = true;
+	      this.set(record);
+	
+	      return this;
+	    }
+	
+	    /**
+	     * Methods returning whether the cursor has a recorded history.
+	     *
+	     * @return {boolean} - `true` if the cursor has a recorded history?
+	     */
+	  }, {
+	    key: 'hasHistory',
+	    value: function hasHistory() {
+	      return !!(this.archive && this.archive.get().length);
+	    }
+	
+	    /**
+	     * Methods returning the cursor's history.
+	     *
+	     * @return {array} - The cursor's history.
+	     */
+	  }, {
+	    key: 'getHistory',
+	    value: function getHistory() {
+	      return this.archive ? this.archive.get() : [];
+	    }
+	
+	    /**
+	     * Methods clearing the cursor's history.
+	     *
+	     * @return {Cursor} - The cursor instance for chaining purposes.
+	     */
+	  }, {
+	    key: 'clearHistory',
+	    value: function clearHistory() {
+	      if (this.archive) this.archive.clear();
+	      return this;
+	    }
+	
+	    /**
+	     * Releasing
+	     * ----------
+	     */
+	
+	    /**
+	     * Methods releasing the cursor from memory.
+	     */
+	  }, {
+	    key: 'release',
+	    value: function release() {
+	
+	      // Removing listeners on parent
+	      if (this._dynamicPath) this.tree.off('write', this._writeHandler);
+	
+	      this.tree.off('update', this._updateHandler);
+	
+	      // Unsubscribe from the parent
+	      if (this.hash) delete this.tree._cursors[this.hash];
+	
+	      // Dereferencing
+	      delete this.tree;
+	      delete this.path;
+	      delete this.solvedPath;
+	      delete this.archive;
+	
+	      // Killing emitter
+	      this.kill();
+	      this.state.killed = true;
+	    }
+	
+	    /**
+	     * Output
+	     * -------
+	     */
+	
+	    /**
+	     * Overriding the `toJSON` method for convenient use with JSON.stringify.
+	     *
+	     * @return {mixed} - Data at cursor.
+	     */
+	  }, {
+	    key: 'toJSON',
+	    value: function toJSON() {
+	      return this.serialize();
+	    }
+	
+	    /**
+	     * Overriding the `toString` method for debugging purposes.
+	     *
+	     * @return {string} - The cursor's identity.
+	     */
+	  }, {
+	    key: 'toString',
+	    value: function toString() {
+	      return this._identity;
+	    }
+	  }]);
+	
+	  return Cursor;
+	})(_emmett2['default']);
+	
+	exports['default'] = Cursor;
+	if (typeof Symbol === 'function' && typeof Symbol.iterator !== 'undefined') {
+	  Cursor.prototype[Symbol.iterator] = function () {
+	    var array = this._get().data;
+	
+	    if (!_type2['default'].array(array)) throw Error('baobab.Cursor.@@iterate: cannot iterate a non-list type.');
+	
+	    var i = 0;
+	
+	    var cursor = this,
+	        length = array.length;
+	
+	    return {
+	      next: function next() {
+	        if (i < length) {
+	          return {
+	            value: cursor.select(i++)
+	          };
+	        }
+	
+	        return {
+	          done: true
+	        };
+	      }
+	    };
+	  };
+	}
+	
+	/**
+	 * Setter Methods
+	 * ---------------
+	 *
+	 * Those methods are dynamically assigned to the class for DRY reasons.
+	 */
+	
+	// Not using a Set so that ES5 consumers don't pay a bundle size price
+	var INTRANSITIVE_SETTERS = {
+	  unset: true,
+	  pop: true,
+	  shift: true
+	};
+	
+	/**
+	 * Function creating a setter method for the Cursor class.
+	 *
+	 * @param {string}   name          - the method's name.
+	 * @param {function} [typeChecker] - a function checking that the given value is
+	 *                                   valid for the given operation.
+	 */
+	function makeSetter(name, typeChecker) {
+	
+	  /**
+	   * Binding a setter method to the Cursor class and having the following
+	   * definition.
+	   *
+	   * Note: this is not really possible to make those setters variadic because
+	   * it would create an impossible polymorphism with path.
+	   *
+	   * @todo: perform value validation elsewhere so that tree.update can
+	   * beneficiate from it.
+	   *
+	   * Arity (1):
+	   * @param  {mixed} value - New value to set at cursor's path.
+	   *
+	   * Arity (2):
+	   * @param  {path}  path  - Subpath to update starting from cursor's.
+	   * @param  {mixed} value - New value to set.
+	   *
+	   * @return {mixed}       - Data at path.
+	   */
+	  Cursor.prototype[name] = function (path, value) {
+	
+	    // We should warn the user if he applies to many arguments to the function
+	    if (arguments.length > 2) throw (0, _helpers.makeError)('Baobab.Cursor.' + name + ': too many arguments.');
+	
+	    // Handling arities
+	    if (arguments.length === 1 && !INTRANSITIVE_SETTERS[name]) {
+	      value = path;
+	      path = [];
+	    }
+	
+	    // Coerce path
+	    path = (0, _helpers.coercePath)(path);
+	
+	    // Checking the path's validity
+	    if (!_type2['default'].path(path)) throw (0, _helpers.makeError)('Baobab.Cursor.' + name + ': invalid path.', { path: path });
+	
+	    // Checking the value's validity
+	    if (typeChecker && !typeChecker(value)) throw (0, _helpers.makeError)('Baobab.Cursor.' + name + ': invalid value.', { path: path, value: value });
+	
+	    // Checking the solvability of the cursor's dynamic path
+	    if (!this.solvedPath) throw (0, _helpers.makeError)('Baobab.Cursor.' + name + ': the dynamic path of the cursor cannot be solved.', { path: this.path });
+	
+	    var fullPath = this.solvedPath.concat(path);
+	
+	    // Filing the update to the tree
+	    return this.tree.update(fullPath, {
+	      type: name,
+	      value: value
+	    });
+	  };
+	}
+	
+	/**
+	 * Making the necessary setters.
+	 */
+	makeSetter('set');
+	makeSetter('unset');
+	makeSetter('apply', _type2['default']['function']);
+	makeSetter('push');
+	makeSetter('concat', _type2['default'].array);
+	makeSetter('unshift');
+	makeSetter('pop');
+	makeSetter('shift');
+	makeSetter('splice', _type2['default'].splicer);
+	makeSetter('merge', _type2['default'].object);
+	makeSetter('deepMerge', _type2['default'].object);
+	module.exports = exports['default'];
+
+/***/ },
+/* 222 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Baobab Monkeys
+	 * ===============
+	 *
+	 * Exposing both handy monkey definitions and the underlying working class.
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+	
+	var _type = __webpack_require__(223);
+	
+	var _type2 = _interopRequireDefault(_type);
+	
+	var _update2 = __webpack_require__(224);
+	
+	var _update3 = _interopRequireDefault(_update2);
+	
+	var _helpers = __webpack_require__(225);
+	
+	/**
+	 * Monkey Definition class
+	 * Note: The only reason why this is a class is to be able to spot it within
+	 * otherwise ordinary data.
+	 *
+	 * @constructor
+	 * @param {array|object} definition - The formal definition of the monkey.
+	 */
+	
+	var MonkeyDefinition = function MonkeyDefinition(definition) {
+	  var _this = this;
+	
+	  _classCallCheck(this, MonkeyDefinition);
+	
+	  var monkeyType = _type2['default'].monkeyDefinition(definition);
+	
+	  if (!monkeyType) throw (0, _helpers.makeError)('Baobab.monkey: invalid definition.', { definition: definition });
+	
+	  this.type = monkeyType;
+	
+	  if (this.type === 'object') {
+	    this.getter = definition.get;
+	    this.projection = definition.cursors || {};
+	    this.paths = Object.keys(this.projection).map(function (k) {
+	      return _this.projection[k];
+	    });
+	    this.options = definition.options || {};
+	  } else {
+	    var offset = 1,
+	        options = {};
+	
+	    if (_type2['default'].object(definition[definition.length - 1])) {
+	      offset++;
+	      options = definition[definition.length - 1];
+	    }
+	
+	    this.getter = definition[definition.length - offset];
+	    this.projection = definition.slice(0, -offset);
+	    this.paths = this.projection;
+	    this.options = options;
+	  }
+	
+	  // Coercing paths for convenience
+	  this.paths = this.paths.map(function (p) {
+	    return [].concat(p);
+	  });
+	
+	  // Does the definition contain dynamic paths
+	  this.hasDynamicPaths = this.paths.some(_type2['default'].dynamicPath);
+	}
+	
+	/**
+	 * Monkey core class
+	 *
+	 * @constructor
+	 * @param {Baobab}           tree       - The bound tree.
+	 * @param {MonkeyDefinition} definition - A definition instance.
+	 */
+	;
+	
+	exports.MonkeyDefinition = MonkeyDefinition;
+	
+	var Monkey = (function () {
+	  function Monkey(tree, pathInTree, definition) {
+	    var _this2 = this;
+	
+	    _classCallCheck(this, Monkey);
+	
+	    // Properties
+	    this.tree = tree;
+	    this.path = pathInTree;
+	    this.definition = definition;
+	
+	    // Adapting the definition's paths & projection to this monkey's case
+	    var projection = definition.projection,
+	        relative = _helpers.solveRelativePath.bind(null, pathInTree.slice(0, -1));
+	
+	    if (definition.type === 'object') {
+	      this.projection = Object.keys(projection).reduce(function (acc, k) {
+	        acc[k] = relative(projection[k]);
+	        return acc;
+	      }, {});
+	      this.depPaths = Object.keys(this.projection).map(function (k) {
+	        return _this2.projection[k];
+	      });
+	    } else {
+	      this.projection = projection.map(relative);
+	      this.depPaths = this.projection;
+	    }
+	
+	    // Internal state
+	    this.state = {
+	      killed: false
+	    };
+	
+	    /**
+	     * Listener on the tree's `write` event.
+	     *
+	     * When the tree writes, this listener will check whether the updated paths
+	     * are of any use to the monkey and, if so, will update the tree's node
+	     * where the monkey sits.
+	     */
+	    this.writeListener = function (_ref) {
+	      var path = _ref.data.path;
+	
+	      if (_this2.state.killed) return;
+	
+	      // Is the monkey affected by the current write event?
+	      var concerned = (0, _helpers.solveUpdate)([path], _this2.relatedPaths());
+	
+	      if (concerned) _this2.update();
+	    };
+	
+	    /**
+	     * Listener on the tree's `monkey` event.
+	     *
+	     * When another monkey updates, this listener will check whether the
+	     * updated paths are of any use to the monkey and, if so, will update the
+	     * tree's node where the monkey sits.
+	     */
+	    this.recursiveListener = function (_ref2) {
+	      var _ref2$data = _ref2.data;
+	      var monkey = _ref2$data.monkey;
+	      var path = _ref2$data.path;
+	
+	      if (_this2.state.killed) return;
+	
+	      // Breaking if this is the same monkey
+	      if (_this2 === monkey) return;
+	
+	      // Is the monkey affected by the current monkey event?
+	      var concerned = (0, _helpers.solveUpdate)([path], _this2.relatedPaths(false));
+	
+	      if (concerned) _this2.update();
+	    };
+	
+	    // Binding listeners
+	    this.tree.on('write', this.writeListener);
+	    this.tree.on('_monkey', this.recursiveListener);
+	
+	    // Updating relevant node
+	    this.update();
+	  }
+	
+	  /**
+	   * Method returning solved paths related to the monkey.
+	   *
+	   * @param  {boolean} recursive - Should we compute recursive paths?
+	   * @return {array}             - An array of related paths.
+	   */
+	
+	  _createClass(Monkey, [{
+	    key: 'relatedPaths',
+	    value: function relatedPaths() {
+	      var _this3 = this;
+	
+	      var recursive = arguments.length <= 0 || arguments[0] === undefined ? true : arguments[0];
+	
+	      var paths = undefined;
+	
+	      if (this.definition.hasDynamicPaths) paths = this.depPaths.map(function (p) {
+	        return (0, _helpers.getIn)(_this3.tree._data, p).solvedPath;
+	      });else paths = this.depPaths;
+	
+	      var isRecursive = recursive && this.depPaths.some(function (p) {
+	        return !!_type2['default'].monkeyPath(_this3.tree._monkeys, p);
+	      });
+	
+	      if (!isRecursive) return paths;
+	
+	      return paths.reduce(function (accumulatedPaths, path) {
+	        var monkeyPath = _type2['default'].monkeyPath(_this3.tree._monkeys, path);
+	
+	        if (!monkeyPath) return accumulatedPaths.concat([path]);
+	
+	        // Solving recursive path
+	        var relatedMonkey = (0, _helpers.getIn)(_this3.tree._monkeys, monkeyPath).data;
+	
+	        return accumulatedPaths.concat(relatedMonkey.relatedPaths());
+	      }, []);
+	    }
+	
+	    /**
+	     * Method used to update the tree's internal data with a lazy getter holding
+	     * the computed data.
+	     *
+	     * @return {Monkey} - Returns itself for chaining purposes.
+	     */
+	  }, {
+	    key: 'update',
+	    value: function update() {
+	      var deps = this.tree.project(this.projection);
+	
+	      var lazyGetter = (function (tree, def, data) {
+	        var cache = null,
+	            alreadyComputed = false;
+	
+	        return function () {
+	
+	          if (!alreadyComputed) {
+	            cache = def.getter.apply(tree, def.type === 'object' ? [data] : data);
+	
+	            if (tree.options.immutable && def.options.immutable !== false) (0, _helpers.deepFreeze)(cache);
+	
+	            alreadyComputed = true;
+	          }
+	
+	          return cache;
+	        };
+	      })(this.tree, this.definition, deps);
+	
+	      lazyGetter.isLazyGetter = true;
+	
+	      // Should we write the lazy getter in the tree or solve it right now?
+	      if (this.tree.options.lazyMonkeys) {
+	        this.tree._data = (0, _update3['default'])(this.tree._data, this.path, {
+	          type: 'monkey',
+	          value: lazyGetter
+	        }, this.tree.options).data;
+	      } else {
+	        var result = (0, _update3['default'])(this.tree._data, this.path, {
+	          type: 'set',
+	          value: lazyGetter(),
+	          options: {
+	            mutableLeaf: !this.definition.options.immutable
+	          }
+	        }, this.tree.options);
+	
+	        if ('data' in result) this.tree._data = result.data;
+	      }
+	
+	      // Notifying the monkey's update so we can handle recursivity
+	      this.tree.emit('_monkey', { monkey: this, path: this.path });
+	
+	      return this;
+	    }
+	
+	    /**
+	     * Method releasing the monkey from memory.
+	     */
+	  }, {
+	    key: 'release',
+	    value: function release() {
+	
+	      // Unbinding events
+	      this.tree.off('write', this.writeListener);
+	      this.tree.off('_monkey', this.monkeyListener);
+	      this.state.killed = true;
+	
+	      // Deleting properties
+	      // NOTE: not deleting this.definition because some strange things happen
+	      // in the _refreshMonkeys method. See #372.
+	      delete this.projection;
+	      delete this.depPaths;
+	      delete this.tree;
+	    }
+	  }]);
+	
+	  return Monkey;
+	})();
+	
+	exports.Monkey = Monkey;
+
+/***/ },
+/* 223 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Baobab Type Checking
+	 * =====================
+	 *
+	 * Helpers functions used throughout the library to perform some type
+	 * tests at runtime.
+	 *
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	
+	var _monkey = __webpack_require__(222);
+	
+	var type = {};
+	
+	/**
+	 * Helpers
+	 * --------
+	 */
+	
+	/**
+	 * Checking whether the given variable is of any of the given types.
+	 *
+	 * @todo   Optimize this function by dropping `some`.
+	 *
+	 * @param  {mixed} target  - Variable to test.
+	 * @param  {array} allowed - Array of allowed types.
+	 * @return {boolean}
+	 */
+	function anyOf(target, allowed) {
+	  return allowed.some(function (t) {
+	    return type[t](target);
+	  });
+	}
+	
+	/**
+	 * Simple types
+	 * -------------
+	 */
+	
+	/**
+	 * Checking whether the given variable is an array.
+	 *
+	 * @param  {mixed} target - Variable to test.
+	 * @return {boolean}
+	 */
+	type.array = function (target) {
+	  return Array.isArray(target);
+	};
+	
+	/**
+	 * Checking whether the given variable is an object.
+	 *
+	 * @param  {mixed} target - Variable to test.
+	 * @return {boolean}
+	 */
+	type.object = function (target) {
+	  return target && typeof target === 'object' && !Array.isArray(target) && !(target instanceof Date) && !(target instanceof RegExp) && !(typeof Map === 'function' && target instanceof Map) && !(typeof Set === 'function' && target instanceof Set);
+	};
+	
+	/**
+	 * Checking whether the given variable is a string.
+	 *
+	 * @param  {mixed} target - Variable to test.
+	 * @return {boolean}
+	 */
+	type.string = function (target) {
+	  return typeof target === 'string';
+	};
+	
+	/**
+	 * Checking whether the given variable is a number.
+	 *
+	 * @param  {mixed} target - Variable to test.
+	 * @return {boolean}
+	 */
+	type.number = function (target) {
+	  return typeof target === 'number';
+	};
+	
+	/**
+	 * Checking whether the given variable is a function.
+	 *
+	 * @param  {mixed} target - Variable to test.
+	 * @return {boolean}
+	 */
+	type['function'] = function (target) {
+	  return typeof target === 'function';
+	};
+	
+	/**
+	 * Checking whether the given variable is a JavaScript primitive.
+	 *
+	 * @param  {mixed} target - Variable to test.
+	 * @return {boolean}
+	 */
+	type.primitive = function (target) {
+	  return target !== Object(target);
+	};
+	
+	/**
+	 * Complex types
+	 * --------------
+	 */
+	
+	/**
+	 * Checking whether the given variable is a valid splicer.
+	 *
+	 * @param  {mixed} target    - Variable to test.
+	 * @param  {array} [allowed] - Optional valid types in path.
+	 * @return {boolean}
+	 */
+	type.splicer = function (target) {
+	  if (!type.array(target) || target.length < 2) return false;
+	
+	  return anyOf(target[0], ['number', 'function', 'object']) && type.number(target[1]);
+	};
+	
+	/**
+	 * Checking whether the given variable is a valid cursor path.
+	 *
+	 * @param  {mixed} target    - Variable to test.
+	 * @param  {array} [allowed] - Optional valid types in path.
+	 * @return {boolean}
+	 */
+	
+	// Order is important for performance reasons
+	var ALLOWED_FOR_PATH = ['string', 'number', 'function', 'object'];
+	
+	type.path = function (target) {
+	  if (!target && target !== 0 && target !== '') return false;
+	
+	  return [].concat(target).every(function (step) {
+	    return anyOf(step, ALLOWED_FOR_PATH);
+	  });
+	};
+	
+	/**
+	 * Checking whether the given path is a dynamic one.
+	 *
+	 * @param  {mixed} path - The path to test.
+	 * @return {boolean}
+	 */
+	type.dynamicPath = function (path) {
+	  return path.some(function (step) {
+	    return type['function'](step) || type.object(step);
+	  });
+	};
+	
+	/**
+	 * Retrieve any monkey subpath in the given path or null if the path never comes
+	 * across computed data.
+	 *
+	 * @param  {mixed} data - The data to test.
+	 * @param  {array} path - The path to test.
+	 * @return {boolean}
+	 */
+	type.monkeyPath = function (data, path) {
+	  var subpath = [];
+	
+	  var c = data,
+	      i = undefined,
+	      l = undefined;
+	
+	  for (i = 0, l = path.length; i < l; i++) {
+	    subpath.push(path[i]);
+	
+	    if (typeof c !== 'object') return null;
+	
+	    c = c[path[i]];
+	
+	    if (c instanceof _monkey.Monkey) return subpath;
+	  }
+	
+	  return null;
+	};
+	
+	/**
+	 * Check if the given object property is a lazy getter used by a monkey.
+	 *
+	 * @param  {mixed}   o           - The target object.
+	 * @param  {string}  propertyKey - The property to test.
+	 * @return {boolean}
+	 */
+	type.lazyGetter = function (o, propertyKey) {
+	  var descriptor = Object.getOwnPropertyDescriptor(o, propertyKey);
+	
+	  return descriptor && descriptor.get && descriptor.get.isLazyGetter === true;
+	};
+	
+	/**
+	 * Returns the type of the given monkey definition or `null` if invalid.
+	 *
+	 * @param  {mixed} definition - The definition to check.
+	 * @return {string|null}
+	 */
+	type.monkeyDefinition = function (definition) {
+	
+	  if (type.object(definition)) {
+	    if (!type['function'](definition.get) || definition.cursors && (!type.object(definition.cursors) || !Object.keys(definition.cursors).every(function (k) {
+	      return type.path(definition.cursors[k]);
+	    }))) return null;
+	
+	    return 'object';
+	  } else if (type.array(definition)) {
+	    var offset = 1;
+	
+	    if (type.object(definition[definition.length - 1])) offset++;
+	
+	    if (!type['function'](definition[definition.length - offset]) || !definition.slice(0, -offset).every(function (p) {
+	      return type.path(p);
+	    })) return null;
+	
+	    return 'array';
+	  }
+	
+	  return null;
+	};
+	
+	/**
+	 * Checking whether the given watcher definition is valid.
+	 *
+	 * @param  {mixed}   definition - The definition to check.
+	 * @return {boolean}
+	 */
+	type.watcherMapping = function (definition) {
+	  return type.object(definition) && Object.keys(definition).every(function (k) {
+	    return type.path(definition[k]);
+	  });
+	};
+	
+	/**
+	 * Checking whether the given string is a valid operation type.
+	 *
+	 * @param  {mixed} string - The string to test.
+	 * @return {boolean}
+	 */
+	
+	// Ordered by likeliness
+	var VALID_OPERATIONS = ['set', 'apply', 'push', 'unshift', 'concat', 'pop', 'shift', 'deepMerge', 'merge', 'splice', 'unset'];
+	
+	type.operationType = function (string) {
+	  return typeof string === 'string' && !! ~VALID_OPERATIONS.indexOf(string);
+	};
+	
+	exports['default'] = type;
+	module.exports = exports['default'];
+
+/***/ },
+/* 224 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Baobab Update
+	 * ==============
+	 *
+	 * The tree's update scheme.
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	exports['default'] = update;
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } }
+	
+	var _type = __webpack_require__(223);
+	
+	var _type2 = _interopRequireDefault(_type);
+	
+	var _helpers = __webpack_require__(225);
+	
+	function err(operation, expectedTarget, path) {
+	  return (0, _helpers.makeError)('Baobab.update: cannot apply the "' + operation + '" on ' + ('a non ' + expectedTarget + ' (path: /' + path.join('/') + ').'), { path: path });
+	}
+	
+	/**
+	 * Function aiming at applying a single update operation on the given tree's
+	 * data.
+	 *
+	 * @param  {mixed}  data      - The tree's data.
+	 * @param  {path}   path      - Path of the update.
+	 * @param  {object} operation - The operation to apply.
+	 * @param  {object} [opts]    - Optional options.
+	 * @return {mixed}            - Both the new tree's data and the updated node.
+	 */
+	
+	function update(data, path, operation) {
+	  var opts = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
+	  var operationType = operation.type;
+	  var value = operation.value;
+	  var _operation$options = operation.options;
+	  var operationOptions = _operation$options === undefined ? {} : _operation$options;
+	
+	  // Dummy root, so we can shift and alter the root
+	  var dummy = { root: data },
+	      dummyPath = ['root'].concat(_toConsumableArray(path)),
+	      currentPath = [];
+	
+	  // Walking the path
+	  var p = dummy,
+	      i = undefined,
+	      l = undefined,
+	      s = undefined;
+	
+	  for (i = 0, l = dummyPath.length; i < l; i++) {
+	
+	    // Current item's reference is therefore p[s]
+	    // The reason why we don't create a variable here for convenience
+	    // is because we actually need to mutate the reference.
+	    s = dummyPath[i];
+	
+	    // Updating the path
+	    if (i > 0) currentPath.push(s);
+	
+	    // If we reached the end of the path, we apply the operation
+	    if (i === l - 1) {
+	
+	      /**
+	       * Set
+	       */
+	      if (operationType === 'set') {
+	
+	        // Purity check
+	        if (opts.pure && p[s] === value) return { node: p[s] };
+	
+	        if (_type2['default'].lazyGetter(p, s)) {
+	          Object.defineProperty(p, s, {
+	            value: value,
+	            enumerable: true,
+	            configurable: true
+	          });
+	        } else if (opts.persistent && !operationOptions.mutableLeaf) {
+	          p[s] = (0, _helpers.shallowClone)(value);
+	        } else {
+	          p[s] = value;
+	        }
+	      }
+	
+	      /**
+	       * Monkey
+	       */
+	      else if (operationType === 'monkey') {
+	          Object.defineProperty(p, s, {
+	            get: value,
+	            enumerable: true,
+	            configurable: true
+	          });
+	        }
+	
+	        /**
+	         * Apply
+	         */
+	        else if (operationType === 'apply') {
+	            var result = value(p[s]);
+	
+	            // Purity check
+	            if (opts.pure && p[s] === result) return { node: p[s] };
+	
+	            if (_type2['default'].lazyGetter(p, s)) {
+	              Object.defineProperty(p, s, {
+	                value: result,
+	                enumerable: true,
+	                configurable: true
+	              });
+	            } else if (opts.persistent) {
+	              p[s] = (0, _helpers.shallowClone)(result);
+	            } else {
+	              p[s] = result;
+	            }
+	          }
+	
+	          /**
+	           * Push
+	           */
+	          else if (operationType === 'push') {
+	              if (!_type2['default'].array(p[s])) throw err('push', 'array', currentPath);
+	
+	              if (opts.persistent) p[s] = p[s].concat([value]);else p[s].push(value);
+	            }
+	
+	            /**
+	             * Unshift
+	             */
+	            else if (operationType === 'unshift') {
+	                if (!_type2['default'].array(p[s])) throw err('unshift', 'array', currentPath);
+	
+	                if (opts.persistent) p[s] = [value].concat(p[s]);else p[s].unshift(value);
+	              }
+	
+	              /**
+	               * Concat
+	               */
+	              else if (operationType === 'concat') {
+	                  if (!_type2['default'].array(p[s])) throw err('concat', 'array', currentPath);
+	
+	                  if (opts.persistent) p[s] = p[s].concat(value);else p[s].push.apply(p[s], value);
+	                }
+	
+	                /**
+	                 * Splice
+	                 */
+	                else if (operationType === 'splice') {
+	                    if (!_type2['default'].array(p[s])) throw err('splice', 'array', currentPath);
+	
+	                    if (opts.persistent) p[s] = _helpers.splice.apply(null, [p[s]].concat(value));else p[s].splice.apply(p[s], value);
+	                  }
+	
+	                  /**
+	                   * Pop
+	                   */
+	                  else if (operationType === 'pop') {
+	                      if (!_type2['default'].array(p[s])) throw err('pop', 'array', currentPath);
+	
+	                      if (opts.persistent) p[s] = (0, _helpers.splice)(p[s], -1, 1);else p[s].pop();
+	                    }
+	
+	                    /**
+	                     * Shift
+	                     */
+	                    else if (operationType === 'shift') {
+	                        if (!_type2['default'].array(p[s])) throw err('shift', 'array', currentPath);
+	
+	                        if (opts.persistent) p[s] = (0, _helpers.splice)(p[s], 0, 1);else p[s].shift();
+	                      }
+	
+	                      /**
+	                       * Unset
+	                       */
+	                      else if (operationType === 'unset') {
+	                          if (_type2['default'].object(p)) delete p[s];else if (_type2['default'].array(p)) p.splice(s, 1);
+	                        }
+	
+	                        /**
+	                         * Merge
+	                         */
+	                        else if (operationType === 'merge') {
+	                            if (!_type2['default'].object(p[s])) throw err('merge', 'object', currentPath);
+	
+	                            if (opts.persistent) p[s] = (0, _helpers.shallowMerge)({}, p[s], value);else p[s] = (0, _helpers.shallowMerge)(p[s], value);
+	                          }
+	
+	                          /**
+	                           * Deep merge
+	                           */
+	                          else if (operationType === 'deepMerge') {
+	                              if (!_type2['default'].object(p[s])) throw err('deepMerge', 'object', currentPath);
+	
+	                              if (opts.persistent) p[s] = (0, _helpers.deepMerge)({}, p[s], value);else p[s] = (0, _helpers.deepMerge)(p[s], value);
+	                            }
+	
+	      // Deep freezing the resulting value
+	      if (opts.immutable && !operationOptions.mutableLeaf) (0, _helpers.deepFreeze)(p);
+	
+	      break;
+	    }
+	
+	    // If we reached a leaf, we override by setting an empty object
+	    else if (_type2['default'].primitive(p[s])) {
+	        p[s] = {};
+	      }
+	
+	      // Else, we shift the reference and continue the path
+	      else if (opts.persistent) {
+	          p[s] = (0, _helpers.shallowClone)(p[s]);
+	        }
+	
+	    // Should we freeze the current step before continuing?
+	    if (opts.immutable && l > 0) (0, _helpers.freeze)(p);
+	
+	    p = p[s];
+	  }
+	
+	  // If we are updating a dynamic node, we need not return the affected node
+	  if (_type2['default'].lazyGetter(p, s)) return { data: dummy.root };
+	
+	  // Returning new data object
+	  return { data: dummy.root, node: p[s] };
+	}
+	
+	module.exports = exports['default'];
+
+/***/ },
+/* 225 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {/* eslint eqeqeq: 0 */
+	
+	/**
+	 * Baobab Helpers
+	 * ===============
+	 *
+	 * Miscellaneous helper functions.
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+	
+	exports.arrayFrom = arrayFrom;
+	exports.before = before;
+	exports.coercePath = coercePath;
+	exports.getIn = getIn;
+	exports.makeError = makeError;
+	exports.solveRelativePath = solveRelativePath;
+	exports.solveUpdate = solveUpdate;
+	exports.splice = splice;
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+	
+	var _monkey = __webpack_require__(222);
+	
+	var _type = __webpack_require__(223);
+	
+	var _type2 = _interopRequireDefault(_type);
+	
+	/**
+	 * Noop function
+	 */
+	var noop = Function.prototype;
+	
+	/**
+	 * Function returning the index of the first element of a list matching the
+	 * given predicate.
+	 *
+	 * @param  {array}     a  - The target array.
+	 * @param  {function}  fn - The predicate function.
+	 * @return {mixed}        - The index of the first matching item or -1.
+	 */
+	function index(a, fn) {
+	  var i = undefined,
+	      l = undefined;
+	  for (i = 0, l = a.length; i < l; i++) {
+	    if (fn(a[i])) return i;
+	  }
+	  return -1;
+	}
+	
+	/**
+	 * Efficient slice function used to clone arrays or parts of them.
+	 *
+	 * @param  {array} array - The array to slice.
+	 * @return {array}       - The sliced array.
+	 */
+	function slice(array) {
+	  var newArray = new Array(array.length);
+	
+	  var i = undefined,
+	      l = undefined;
+	
+	  for (i = 0, l = array.length; i < l; i++) newArray[i] = array[i];
+	
+	  return newArray;
+	}
+	
+	/**
+	 * Archive abstraction
+	 *
+	 * @constructor
+	 * @param {integer} size - Maximum number of records to store.
+	 */
+	
+	var Archive = (function () {
+	  function Archive(size) {
+	    _classCallCheck(this, Archive);
+	
+	    this.size = size;
+	    this.records = [];
+	  }
+	
+	  /**
+	   * Function creating a real array from what should be an array but is not.
+	   * I'm looking at you nasty `arguments`...
+	   *
+	   * @param  {mixed} culprit - The culprit to convert.
+	   * @return {array}         - The real array.
+	   */
+	
+	  /**
+	   * Method retrieving the records.
+	   *
+	   * @return {array} - The records.
+	   */
+	
+	  _createClass(Archive, [{
+	    key: 'get',
+	    value: function get() {
+	      return this.records;
+	    }
+	
+	    /**
+	     * Method adding a record to the archive
+	     *
+	     * @param {object}  record - The record to store.
+	     * @return {Archive}       - The archive itself for chaining purposes.
+	     */
+	  }, {
+	    key: 'add',
+	    value: function add(record) {
+	      this.records.unshift(record);
+	
+	      // If the number of records is exceeded, we truncate the records
+	      if (this.records.length > this.size) this.records.length = this.size;
+	
+	      return this;
+	    }
+	
+	    /**
+	     * Method clearing the records.
+	     *
+	     * @return {Archive} - The archive itself for chaining purposes.
+	     */
+	  }, {
+	    key: 'clear',
+	    value: function clear() {
+	      this.records = [];
+	      return this;
+	    }
+	
+	    /**
+	     * Method to go back in time.
+	     *
+	     * @param {integer} steps - Number of steps we should go back by.
+	     * @return {number}       - The last record.
+	     */
+	  }, {
+	    key: 'back',
+	    value: function back(steps) {
+	      var record = this.records[steps - 1];
+	
+	      if (record) this.records = this.records.slice(steps);
+	      return record;
+	    }
+	  }]);
+	
+	  return Archive;
+	})();
+	
+	exports.Archive = Archive;
+	
+	function arrayFrom(culprit) {
+	  return slice(culprit);
+	}
+	
+	/**
+	 * Function decorating one function with another that will be called before the
+	 * decorated one.
+	 *
+	 * @param  {function} decorator - The decorating function.
+	 * @param  {function} fn        - The function to decorate.
+	 * @return {function}           - The decorated function.
+	 */
+	
+	function before(decorator, fn) {
+	  return function () {
+	    decorator.apply(null, arguments);
+	    fn.apply(null, arguments);
+	  };
+	}
+	
+	/**
+	 * Function cloning the given regular expression. Supports `y` and `u` flags
+	 * already.
+	 *
+	 * @param  {RegExp} re - The target regular expression.
+	 * @return {RegExp}    - The cloned regular expression.
+	 */
+	function cloneRegexp(re) {
+	  var pattern = re.source;
+	
+	  var flags = '';
+	
+	  if (re.global) flags += 'g';
+	  if (re.multiline) flags += 'm';
+	  if (re.ignoreCase) flags += 'i';
+	  if (re.sticky) flags += 'y';
+	  if (re.unicode) flags += 'u';
+	
+	  return new RegExp(pattern, flags);
+	}
+	
+	/**
+	 * Function cloning the given variable.
+	 *
+	 * @todo: implement a faster way to clone an array.
+	 *
+	 * @param  {boolean} deep - Should we deep clone the variable.
+	 * @param  {mixed}   item - The variable to clone
+	 * @return {mixed}        - The cloned variable.
+	 */
+	function cloner(deep, item) {
+	  if (!item || typeof item !== 'object' || item instanceof Error || item instanceof _monkey.MonkeyDefinition || item instanceof _monkey.Monkey || 'ArrayBuffer' in global && item instanceof ArrayBuffer) return item;
+	
+	  // Array
+	  if (_type2['default'].array(item)) {
+	    if (deep) {
+	      var a = [];
+	
+	      var i = undefined,
+	          l = undefined;
+	
+	      for (i = 0, l = item.length; i < l; i++) a.push(cloner(true, item[i]));
+	      return a;
+	    }
+	
+	    return slice(item);
+	  }
+	
+	  // Date
+	  if (item instanceof Date) return new Date(item.getTime());
+	
+	  // RegExp
+	  if (item instanceof RegExp) return cloneRegexp(item);
+	
+	  // Object
+	  if (_type2['default'].object(item)) {
+	    var o = {};
+	
+	    var k = undefined;
+	
+	    // NOTE: could be possible to erase computed properties through `null`.
+	    for (k in item) {
+	      if (_type2['default'].lazyGetter(item, k)) {
+	        Object.defineProperty(o, k, {
+	          get: Object.getOwnPropertyDescriptor(item, k).get,
+	          enumerable: true,
+	          configurable: true
+	        });
+	      } else if (item.hasOwnProperty(k)) {
+	        o[k] = deep ? cloner(true, item[k]) : item[k];
+	      }
+	    }
+	    return o;
+	  }
+	
+	  return item;
+	}
+	
+	/**
+	 * Exporting shallow and deep cloning functions.
+	 */
+	var shallowClone = cloner.bind(null, false),
+	    deepClone = cloner.bind(null, true);
+	
+	exports.shallowClone = shallowClone;
+	exports.deepClone = deepClone;
+	
+	/**
+	 * Coerce the given variable into a full-fledged path.
+	 *
+	 * @param  {mixed} target - The variable to coerce.
+	 * @return {array}        - The array path.
+	 */
+	
+	function coercePath(target) {
+	  if (target || target === 0 || target === '') return target;
+	  return [];
+	}
+	
+	/**
+	 * Function comparing an object's properties to a given descriptive
+	 * object.
+	 *
+	 * @param  {object} object      - The object to compare.
+	 * @param  {object} description - The description's mapping.
+	 * @return {boolean}            - Whether the object matches the description.
+	 */
+	function compare(object, description) {
+	  var ok = true,
+	      k = undefined;
+	
+	  // If we reached here via a recursive call, object may be undefined because
+	  // not all items in a collection will have the same deep nesting structure.
+	  if (!object) return false;
+	
+	  for (k in description) {
+	    if (_type2['default'].object(description[k])) {
+	      ok = ok && compare(object[k], description[k]);
+	    } else if (_type2['default'].array(description[k])) {
+	      ok = ok && !! ~description[k].indexOf(object[k]);
+	    } else {
+	      if (object[k] !== description[k]) return false;
+	    }
+	  }
+	
+	  return ok;
+	}
+	
+	/**
+	 * Function freezing the given variable if possible.
+	 *
+	 * @param  {boolean} deep - Should we recursively freeze the given objects?
+	 * @param  {object}  o    - The variable to freeze.
+	 * @return {object}    - The merged object.
+	 */
+	function freezer(deep, o) {
+	  if (typeof o !== 'object' || o === null || o instanceof _monkey.Monkey) return;
+	
+	  Object.freeze(o);
+	
+	  if (!deep) return;
+	
+	  if (Array.isArray(o)) {
+	
+	    // Iterating through the elements
+	    var i = undefined,
+	        l = undefined;
+	
+	    for (i = 0, l = o.length; i < l; i++) freezer(true, o[i]);
+	  } else {
+	    var p = undefined,
+	        k = undefined;
+	
+	    for (k in o) {
+	      if (_type2['default'].lazyGetter(o, k)) continue;
+	
+	      p = o[k];
+	
+	      if (!p || !o.hasOwnProperty(k) || typeof p !== 'object' || Object.isFrozen(p)) continue;
+	
+	      freezer(true, p);
+	    }
+	  }
+	}
+	
+	/**
+	 * Exporting both `freeze` and `deepFreeze` functions.
+	 * Note that if the engine does not support `Object.freeze` then this will
+	 * export noop functions instead.
+	 */
+	var isFreezeSupported = typeof Object.freeze === 'function';
+	
+	var freeze = isFreezeSupported ? freezer.bind(null, false) : noop,
+	    deepFreeze = isFreezeSupported ? freezer.bind(null, true) : noop;
+	
+	exports.freeze = freeze;
+	exports.deepFreeze = deepFreeze;
+	
+	/**
+	 * Function retrieving nested data within the given object and according to
+	 * the given path.
+	 *
+	 * @todo: work if dynamic path hit objects also.
+	 * @todo: memoized perfgetters.
+	 *
+	 * @param  {object}  object - The object we need to get data from.
+	 * @param  {array}   path   - The path to follow.
+	 * @return {object}  result            - The result.
+	 * @return {mixed}   result.data       - The data at path, or `undefined`.
+	 * @return {array}   result.solvedPath - The solved path or `null`.
+	 * @return {boolean} result.exists     - Does the path exists in the tree?
+	 */
+	var NOT_FOUND_OBJECT = { data: undefined, solvedPath: null, exists: false };
+	
+	function getIn(object, path) {
+	  if (!path) return NOT_FOUND_OBJECT;
+	
+	  var solvedPath = [];
+	
+	  var exists = true,
+	      c = object,
+	      idx = undefined,
+	      i = undefined,
+	      l = undefined;
+	
+	  for (i = 0, l = path.length; i < l; i++) {
+	    if (!c) return {
+	      data: undefined,
+	      solvedPath: solvedPath.concat(path.slice(i)),
+	      exists: false
+	    };
+	
+	    if (typeof path[i] === 'function') {
+	      if (!_type2['default'].array(c)) return NOT_FOUND_OBJECT;
+	
+	      idx = index(c, path[i]);
+	      if (! ~idx) return NOT_FOUND_OBJECT;
+	
+	      solvedPath.push(idx);
+	      c = c[idx];
+	    } else if (typeof path[i] === 'object') {
+	      if (!_type2['default'].array(c)) return NOT_FOUND_OBJECT;
+	
+	      idx = index(c, function (e) {
+	        return compare(e, path[i]);
+	      });
+	      if (! ~idx) return NOT_FOUND_OBJECT;
+	
+	      solvedPath.push(idx);
+	      c = c[idx];
+	    } else {
+	      solvedPath.push(path[i]);
+	      exists = typeof c === 'object' && path[i] in c;
+	      c = c[path[i]];
+	    }
+	  }
+	
+	  return { data: c, solvedPath: solvedPath, exists: exists };
+	}
+	
+	/**
+	 * Little helper returning a JavaScript error carrying some data with it.
+	 *
+	 * @param  {string} message - The error message.
+	 * @param  {object} [data]  - Optional data to assign to the error.
+	 * @return {Error}          - The created error.
+	 */
+	
+	function makeError(message, data) {
+	  var err = new Error(message);
+	
+	  for (var k in data) {
+	    err[k] = data[k];
+	  }return err;
+	}
+	
+	/**
+	 * Function taking n objects to merge them together.
+	 * Note 1): the latter object will take precedence over the first one.
+	 * Note 2): the first object will be mutated to allow for perf scenarios.
+	 * Note 3): this function will consider monkeys as leaves.
+	 *
+	 * @param  {boolean}   deep    - Whether the merge should be deep or not.
+	 * @param  {...object} objects - Objects to merge.
+	 * @return {object}            - The merged object.
+	 */
+	function merger(deep) {
+	  for (var _len = arguments.length, objects = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	    objects[_key - 1] = arguments[_key];
+	  }
+	
+	  var o = objects[0];
+	
+	  var t = undefined,
+	      i = undefined,
+	      l = undefined,
+	      k = undefined;
+	
+	  for (i = 1, l = objects.length; i < l; i++) {
+	    t = objects[i];
+	
+	    for (k in t) {
+	      if (deep && _type2['default'].object(t[k]) && !(t[k] instanceof _monkey.Monkey)) {
+	        o[k] = merger(true, o[k] || {}, t[k]);
+	      } else {
+	        o[k] = t[k];
+	      }
+	    }
+	  }
+	
+	  return o;
+	}
+	
+	/**
+	 * Exporting both `shallowMerge` and `deepMerge` functions.
+	 */
+	var shallowMerge = merger.bind(null, false),
+	    deepMerge = merger.bind(null, true);
+	
+	exports.shallowMerge = shallowMerge;
+	exports.deepMerge = deepMerge;
+	
+	/**
+	 * Solving a potentially relative path.
+	 *
+	 * @param  {array} base - The base path from which to solve the path.
+	 * @param  {array} to   - The subpath to reach.
+	 * @param  {array}      - The solved absolute path.
+	 */
+	
+	function solveRelativePath(base, to) {
+	  var solvedPath = [];
+	
+	  // Coercing to array
+	  to = [].concat(to);
+	
+	  for (var i = 0, l = to.length; i < l; i++) {
+	    var step = to[i];
+	
+	    if (step === '.') {
+	      if (!i) solvedPath = base.slice(0);
+	    } else if (step === '..') {
+	      solvedPath = (!i ? base : solvedPath).slice(0, -1);
+	    } else {
+	      solvedPath.push(step);
+	    }
+	  }
+	
+	  return solvedPath;
+	}
+	
+	/**
+	 * Function determining whether some paths in the tree were affected by some
+	 * updates that occurred at the given paths. This helper is mainly used at
+	 * cursor level to determine whether the cursor is concerned by the updates
+	 * fired at tree level.
+	 *
+	 * NOTES: 1) If performance become an issue, the following threefold loop
+	 *           can be simplified to a complex twofold one.
+	 *        2) A regex version could also work but I am not confident it would
+	 *           be faster.
+	 *        3) Another solution would be to keep a register of cursors like with
+	 *           the monkeys and update along this tree.
+	 *
+	 * @param  {array} affectedPaths - The paths that were updated.
+	 * @param  {array} comparedPaths - The paths that we are actually interested in.
+	 * @return {boolean}             - Is the update relevant to the compared
+	 *                                 paths?
+	 */
+	
+	function solveUpdate(affectedPaths, comparedPaths) {
+	  var i = undefined,
+	      j = undefined,
+	      k = undefined,
+	      l = undefined,
+	      m = undefined,
+	      n = undefined,
+	      p = undefined,
+	      c = undefined,
+	      s = undefined;
+	
+	  // Looping through possible paths
+	  for (i = 0, l = affectedPaths.length; i < l; i++) {
+	    p = affectedPaths[i];
+	
+	    if (!p.length) return true;
+	
+	    // Looping through logged paths
+	    for (j = 0, m = comparedPaths.length; j < m; j++) {
+	      c = comparedPaths[j];
+	
+	      if (!c || !c.length) return true;
+	
+	      // Looping through steps
+	      for (k = 0, n = c.length; k < n; k++) {
+	        s = c[k];
+	
+	        // If path is not relevant, we break
+	        // NOTE: the '!=' instead of '!==' is required here!
+	        if (s != p[k]) break;
+	
+	        // If we reached last item and we are relevant
+	        if (k + 1 === n || k + 1 === p.length) return true;
+	      }
+	    }
+	  }
+	
+	  return false;
+	}
+	
+	/**
+	 * Non-mutative version of the splice array method.
+	 *
+	 * @param  {array}    array        - The array to splice.
+	 * @param  {integer}  startIndex   - The start index.
+	 * @param  {integer}  nb           - Number of elements to remove.
+	 * @param  {...mixed} elements     - Elements to append after splicing.
+	 * @return {array}                 - The spliced array.
+	 */
+	
+	function splice(array, startIndex, nb) {
+	  nb = Math.max(0, nb);
+	
+	  // Solving startIndex
+	  if (_type2['default']['function'](startIndex)) startIndex = index(array, startIndex);
+	  if (_type2['default'].object(startIndex)) startIndex = index(array, function (e) {
+	    return compare(e, startIndex);
+	  });
+	
+	  // Positive index
+	
+	  for (var _len2 = arguments.length, elements = Array(_len2 > 3 ? _len2 - 3 : 0), _key2 = 3; _key2 < _len2; _key2++) {
+	    elements[_key2 - 3] = arguments[_key2];
+	  }
+	
+	  if (startIndex >= 0) return array.slice(0, startIndex).concat(elements).concat(array.slice(startIndex + nb));
+	
+	  // Negative index
+	  return array.slice(0, array.length + startIndex).concat(elements).concat(array.slice(array.length + startIndex + nb));
+	}
+	
+	/**
+	 * Function returning a unique incremental id each time it is called.
+	 *
+	 * @return {integer} - The latest unique id.
+	 */
+	var uniqid = (function () {
+	  var i = 0;
+	
+	  return function () {
+	    return i++;
+	  };
+	})();
+	
+	exports.uniqid = uniqid;
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 226 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Baobab Watchers
+	 * ================
+	 *
+	 * Abstraction used to listen and retrieve data from multiple parts of a
+	 * Baobab tree at once.
+	 */
+	'use strict';
+	
+	Object.defineProperty(exports, '__esModule', {
+	  value: true
+	});
+	
+	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+	
+	var _get = function get(_x, _x2, _x3) { var _again = true; _function: while (_again) { var object = _x, property = _x2, receiver = _x3; _again = false; if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { _x = parent; _x2 = property; _x3 = receiver; _again = true; desc = parent = undefined; continue _function; } } else if ('value' in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } } };
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
+	
+	function _inherits(subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+	
+	var _emmett = __webpack_require__(220);
+	
+	var _emmett2 = _interopRequireDefault(_emmett);
+	
+	var _cursor = __webpack_require__(221);
+	
+	var _cursor2 = _interopRequireDefault(_cursor);
+	
+	var _type = __webpack_require__(223);
+	
+	var _type2 = _interopRequireDefault(_type);
+	
+	var _helpers = __webpack_require__(225);
+	
+	/**
+	 * Watcher class.
+	 *
+	 * @constructor
+	 * @param {Baobab} tree     - The watched tree.
+	 * @param {object} mapping  - A mapping of the paths to watch in the tree.
+	 */
+	
+	var Watcher = (function (_Emitter) {
+	  _inherits(Watcher, _Emitter);
+	
+	  function Watcher(tree, mapping) {
+	    var _this = this;
+	
+	    _classCallCheck(this, Watcher);
+	
+	    _get(Object.getPrototypeOf(Watcher.prototype), 'constructor', this).call(this);
+	
+	    // Properties
+	    this.tree = tree;
+	    this.mapping = null;
+	
+	    this.state = {
+	      killed: false
+	    };
+	
+	    // Initializing
+	    this.refresh(mapping);
+	
+	    // Listening
+	    this.handler = function (e) {
+	      if (_this.state.killed) return;
+	
+	      var watchedPaths = _this.getWatchedPaths();
+	
+	      if ((0, _helpers.solveUpdate)(e.data.paths, watchedPaths)) return _this.emit('update');
+	    };
+	
+	    this.tree.on('update', this.handler);
+	  }
+	
+	  /**
+	   * Method used to get the current watched paths.
+	   *
+	   * @return {array} - The array of watched paths.
+	   */
+	
+	  _createClass(Watcher, [{
+	    key: 'getWatchedPaths',
+	    value: function getWatchedPaths() {
+	      var _this2 = this;
+	
+	      var rawPaths = Object.keys(this.mapping).map(function (k) {
+	        var v = _this2.mapping[k];
+	
+	        // Watcher mappings can accept a cursor
+	        if (v instanceof _cursor2['default']) return v.solvedPath;
+	
+	        return _this2.mapping[k];
+	      });
+	
+	      return rawPaths.reduce(function (cp, p) {
+	
+	        // Handling path polymorphisms
+	        p = [].concat(p);
+	
+	        // Dynamic path?
+	        if (_type2['default'].dynamicPath(p)) p = (0, _helpers.getIn)(_this2.tree._data, p).solvedPath;
+	
+	        if (!p) return cp;
+	
+	        // Facet path?
+	        var monkeyPath = _type2['default'].monkeyPath(_this2.tree._monkeys, p);
+	
+	        if (monkeyPath) return cp.concat((0, _helpers.getIn)(_this2.tree._monkeys, monkeyPath).data.relatedPaths());
+	
+	        return cp.concat([p]);
+	      }, []);
+	    }
+	
+	    /**
+	     * Method used to return a map of the watcher's cursors.
+	     *
+	     * @return {object} - TMap of relevant cursors.
+	     */
+	  }, {
+	    key: 'getCursors',
+	    value: function getCursors() {
+	      var _this3 = this;
+	
+	      var cursors = {};
+	
+	      Object.keys(this.mapping).forEach(function (k) {
+	        var path = _this3.mapping[k];
+	
+	        if (path instanceof _cursor2['default']) cursors[k] = path;else cursors[k] = _this3.tree.select(path);
+	      });
+	
+	      return cursors;
+	    }
+	
+	    /**
+	     * Method used to refresh the watcher's mapping.
+	     *
+	     * @param  {object}  mapping  - The new mapping to apply.
+	     * @return {Watcher}          - Itself for chaining purposes.
+	     */
+	  }, {
+	    key: 'refresh',
+	    value: function refresh(mapping) {
+	
+	      if (!_type2['default'].watcherMapping(mapping)) throw (0, _helpers.makeError)('Baobab.watch: invalid mapping.', { mapping: mapping });
+	
+	      this.mapping = mapping;
+	
+	      // Creating the get method
+	      var projection = {};
+	
+	      for (var k in mapping) {
+	        projection[k] = mapping[k] instanceof _cursor2['default'] ? mapping[k].path : mapping[k];
+	      }this.get = this.tree.project.bind(this.tree, projection);
+	    }
+	
+	    /**
+	     * Methods releasing the watcher from memory.
+	     */
+	  }, {
+	    key: 'release',
+	    value: function release() {
+	
+	      this.tree.off('update', this.handler);
+	      this.state.killed = true;
+	      this.kill();
+	    }
+	  }]);
+	
+	  return Watcher;
+	})(_emmett2['default']);
+	
+	exports['default'] = Watcher;
+	module.exports = exports['default'];
+
+/***/ },
+/* 227 */
+/***/ function(module, exports) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	var isAFunction = function isAFunction(x) {
+	  return typeof x === 'function';
+	};
+	
+	var IO = function IO(value) {
+	  var val = isAFunction(value) ? value : function () {
+	    return value;
+	  };
+	
+	  var api = {
+	    get value() {
+	      return val();
+	    },
+	    perform: function perform() {
+	      return api.value;
+	    },
+	    of: function of(x) {
+	      return IO(x);
+	    },
+	    map: function map(func) {
+	      return IO(function () {
+	        return func(api.value);
+	      });
+	    },
+	    flatMap: function flatMap(func) {
+	      return IO(func(api.value).value);
+	    }
+	  };
+	
+	  return api;
+	};
+	
+	exports.default = IO;
+
+/***/ },
+/* 228 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	var _isomorphicFetch = __webpack_require__(229);
+	
+	var _isomorphicFetch2 = _interopRequireDefault(_isomorphicFetch);
+	
+	var _IO = __webpack_require__(227);
+	
+	var _IO2 = _interopRequireDefault(_IO);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	var isAMonad = function isAMonad(x) {
+	  return x.map && x.flatMap;
+	};
+	var isAString = function isAString(x) {
+	  return typeof x === 'string';
+	};
+	
+	var Continuation = function Continuation(funcOrIo) {
+	  var val = isAMonad(funcOrIo) ? funcOrIo : isAString(funcOrIo) ? (0, _IO2.default)(function () {
+	    return (0, _isomorphicFetch2.default)(funcOrIo);
+	  }) : (0, _IO2.default)(funcOrIo);
+	
+	  var api = {
+	    value: val,
+	    map: function map(f) {
+	      return Continuation(api.value.map(function (prom) {
+	        return prom.then(f);
+	      }));
+	    },
+	    flatMap: function flatMap(f) {
+	      return api.map(f);
+	    },
+	    perform: function perform() {
+	      return api.value.perform();
+	    }
+	  };
+	
+	  return api;
+	};
+	
+	exports.default = Continuation;
+
+/***/ },
+/* 229 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// the whatwg-fetch polyfill installs the fetch() function
+	// on the global object (window or self)
+	//
+	// Return that as the export for use in Webpack, Browserify etc.
+	__webpack_require__(230);
+	module.exports = self.fetch.bind(self);
+
+
+/***/ },
+/* 230 */
+/***/ function(module, exports) {
+
+	(function(self) {
+	  'use strict';
+	
+	  if (self.fetch) {
+	    return
+	  }
+	
+	  function normalizeName(name) {
+	    if (typeof name !== 'string') {
+	      name = String(name)
+	    }
+	    if (/[^a-z0-9\-#$%&'*+.\^_`|~]/i.test(name)) {
+	      throw new TypeError('Invalid character in header field name')
+	    }
+	    return name.toLowerCase()
+	  }
+	
+	  function normalizeValue(value) {
+	    if (typeof value !== 'string') {
+	      value = String(value)
+	    }
+	    return value
+	  }
+	
+	  function Headers(headers) {
+	    this.map = {}
+	
+	    if (headers instanceof Headers) {
+	      headers.forEach(function(value, name) {
+	        this.append(name, value)
+	      }, this)
+	
+	    } else if (headers) {
+	      Object.getOwnPropertyNames(headers).forEach(function(name) {
+	        this.append(name, headers[name])
+	      }, this)
+	    }
+	  }
+	
+	  Headers.prototype.append = function(name, value) {
+	    name = normalizeName(name)
+	    value = normalizeValue(value)
+	    var list = this.map[name]
+	    if (!list) {
+	      list = []
+	      this.map[name] = list
+	    }
+	    list.push(value)
+	  }
+	
+	  Headers.prototype['delete'] = function(name) {
+	    delete this.map[normalizeName(name)]
+	  }
+	
+	  Headers.prototype.get = function(name) {
+	    var values = this.map[normalizeName(name)]
+	    return values ? values[0] : null
+	  }
+	
+	  Headers.prototype.getAll = function(name) {
+	    return this.map[normalizeName(name)] || []
+	  }
+	
+	  Headers.prototype.has = function(name) {
+	    return this.map.hasOwnProperty(normalizeName(name))
+	  }
+	
+	  Headers.prototype.set = function(name, value) {
+	    this.map[normalizeName(name)] = [normalizeValue(value)]
+	  }
+	
+	  Headers.prototype.forEach = function(callback, thisArg) {
+	    Object.getOwnPropertyNames(this.map).forEach(function(name) {
+	      this.map[name].forEach(function(value) {
+	        callback.call(thisArg, value, name, this)
+	      }, this)
+	    }, this)
+	  }
+	
+	  function consumed(body) {
+	    if (body.bodyUsed) {
+	      return Promise.reject(new TypeError('Already read'))
+	    }
+	    body.bodyUsed = true
+	  }
+	
+	  function fileReaderReady(reader) {
+	    return new Promise(function(resolve, reject) {
+	      reader.onload = function() {
+	        resolve(reader.result)
+	      }
+	      reader.onerror = function() {
+	        reject(reader.error)
+	      }
+	    })
+	  }
+	
+	  function readBlobAsArrayBuffer(blob) {
+	    var reader = new FileReader()
+	    reader.readAsArrayBuffer(blob)
+	    return fileReaderReady(reader)
+	  }
+	
+	  function readBlobAsText(blob) {
+	    var reader = new FileReader()
+	    reader.readAsText(blob)
+	    return fileReaderReady(reader)
+	  }
+	
+	  var support = {
+	    blob: 'FileReader' in self && 'Blob' in self && (function() {
+	      try {
+	        new Blob();
+	        return true
+	      } catch(e) {
+	        return false
+	      }
+	    })(),
+	    formData: 'FormData' in self,
+	    arrayBuffer: 'ArrayBuffer' in self
+	  }
+	
+	  function Body() {
+	    this.bodyUsed = false
+	
+	
+	    this._initBody = function(body) {
+	      this._bodyInit = body
+	      if (typeof body === 'string') {
+	        this._bodyText = body
+	      } else if (support.blob && Blob.prototype.isPrototypeOf(body)) {
+	        this._bodyBlob = body
+	      } else if (support.formData && FormData.prototype.isPrototypeOf(body)) {
+	        this._bodyFormData = body
+	      } else if (!body) {
+	        this._bodyText = ''
+	      } else if (support.arrayBuffer && ArrayBuffer.prototype.isPrototypeOf(body)) {
+	        // Only support ArrayBuffers for POST method.
+	        // Receiving ArrayBuffers happens via Blobs, instead.
+	      } else {
+	        throw new Error('unsupported BodyInit type')
+	      }
+	
+	      if (!this.headers.get('content-type')) {
+	        if (typeof body === 'string') {
+	          this.headers.set('content-type', 'text/plain;charset=UTF-8')
+	        } else if (this._bodyBlob && this._bodyBlob.type) {
+	          this.headers.set('content-type', this._bodyBlob.type)
+	        }
+	      }
+	    }
+	
+	    if (support.blob) {
+	      this.blob = function() {
+	        var rejected = consumed(this)
+	        if (rejected) {
+	          return rejected
+	        }
+	
+	        if (this._bodyBlob) {
+	          return Promise.resolve(this._bodyBlob)
+	        } else if (this._bodyFormData) {
+	          throw new Error('could not read FormData body as blob')
+	        } else {
+	          return Promise.resolve(new Blob([this._bodyText]))
+	        }
+	      }
+	
+	      this.arrayBuffer = function() {
+	        return this.blob().then(readBlobAsArrayBuffer)
+	      }
+	
+	      this.text = function() {
+	        var rejected = consumed(this)
+	        if (rejected) {
+	          return rejected
+	        }
+	
+	        if (this._bodyBlob) {
+	          return readBlobAsText(this._bodyBlob)
+	        } else if (this._bodyFormData) {
+	          throw new Error('could not read FormData body as text')
+	        } else {
+	          return Promise.resolve(this._bodyText)
+	        }
+	      }
+	    } else {
+	      this.text = function() {
+	        var rejected = consumed(this)
+	        return rejected ? rejected : Promise.resolve(this._bodyText)
+	      }
+	    }
+	
+	    if (support.formData) {
+	      this.formData = function() {
+	        return this.text().then(decode)
+	      }
+	    }
+	
+	    this.json = function() {
+	      return this.text().then(JSON.parse)
+	    }
+	
+	    return this
+	  }
+	
+	  // HTTP methods whose capitalization should be normalized
+	  var methods = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT']
+	
+	  function normalizeMethod(method) {
+	    var upcased = method.toUpperCase()
+	    return (methods.indexOf(upcased) > -1) ? upcased : method
+	  }
+	
+	  function Request(input, options) {
+	    options = options || {}
+	    var body = options.body
+	    if (Request.prototype.isPrototypeOf(input)) {
+	      if (input.bodyUsed) {
+	        throw new TypeError('Already read')
+	      }
+	      this.url = input.url
+	      this.credentials = input.credentials
+	      if (!options.headers) {
+	        this.headers = new Headers(input.headers)
+	      }
+	      this.method = input.method
+	      this.mode = input.mode
+	      if (!body) {
+	        body = input._bodyInit
+	        input.bodyUsed = true
+	      }
+	    } else {
+	      this.url = input
+	    }
+	
+	    this.credentials = options.credentials || this.credentials || 'omit'
+	    if (options.headers || !this.headers) {
+	      this.headers = new Headers(options.headers)
+	    }
+	    this.method = normalizeMethod(options.method || this.method || 'GET')
+	    this.mode = options.mode || this.mode || null
+	    this.referrer = null
+	
+	    if ((this.method === 'GET' || this.method === 'HEAD') && body) {
+	      throw new TypeError('Body not allowed for GET or HEAD requests')
+	    }
+	    this._initBody(body)
+	  }
+	
+	  Request.prototype.clone = function() {
+	    return new Request(this)
+	  }
+	
+	  function decode(body) {
+	    var form = new FormData()
+	    body.trim().split('&').forEach(function(bytes) {
+	      if (bytes) {
+	        var split = bytes.split('=')
+	        var name = split.shift().replace(/\+/g, ' ')
+	        var value = split.join('=').replace(/\+/g, ' ')
+	        form.append(decodeURIComponent(name), decodeURIComponent(value))
+	      }
+	    })
+	    return form
+	  }
+	
+	  function headers(xhr) {
+	    var head = new Headers()
+	    var pairs = xhr.getAllResponseHeaders().trim().split('\n')
+	    pairs.forEach(function(header) {
+	      var split = header.trim().split(':')
+	      var key = split.shift().trim()
+	      var value = split.join(':').trim()
+	      head.append(key, value)
+	    })
+	    return head
+	  }
+	
+	  Body.call(Request.prototype)
+	
+	  function Response(bodyInit, options) {
+	    if (!options) {
+	      options = {}
+	    }
+	
+	    this.type = 'default'
+	    this.status = options.status
+	    this.ok = this.status >= 200 && this.status < 300
+	    this.statusText = options.statusText
+	    this.headers = options.headers instanceof Headers ? options.headers : new Headers(options.headers)
+	    this.url = options.url || ''
+	    this._initBody(bodyInit)
+	  }
+	
+	  Body.call(Response.prototype)
+	
+	  Response.prototype.clone = function() {
+	    return new Response(this._bodyInit, {
+	      status: this.status,
+	      statusText: this.statusText,
+	      headers: new Headers(this.headers),
+	      url: this.url
+	    })
+	  }
+	
+	  Response.error = function() {
+	    var response = new Response(null, {status: 0, statusText: ''})
+	    response.type = 'error'
+	    return response
+	  }
+	
+	  var redirectStatuses = [301, 302, 303, 307, 308]
+	
+	  Response.redirect = function(url, status) {
+	    if (redirectStatuses.indexOf(status) === -1) {
+	      throw new RangeError('Invalid status code')
+	    }
+	
+	    return new Response(null, {status: status, headers: {location: url}})
+	  }
+	
+	  self.Headers = Headers;
+	  self.Request = Request;
+	  self.Response = Response;
+	
+	  self.fetch = function(input, init) {
+	    return new Promise(function(resolve, reject) {
+	      var request
+	      if (Request.prototype.isPrototypeOf(input) && !init) {
+	        request = input
+	      } else {
+	        request = new Request(input, init)
+	      }
+	
+	      var xhr = new XMLHttpRequest()
+	
+	      function responseURL() {
+	        if ('responseURL' in xhr) {
+	          return xhr.responseURL
+	        }
+	
+	        // Avoid security warnings on getResponseHeader when not allowed by CORS
+	        if (/^X-Request-URL:/m.test(xhr.getAllResponseHeaders())) {
+	          return xhr.getResponseHeader('X-Request-URL')
+	        }
+	
+	        return;
+	      }
+	
+	      xhr.onload = function() {
+	        var status = (xhr.status === 1223) ? 204 : xhr.status
+	        if (status < 100 || status > 599) {
+	          reject(new TypeError('Network request failed'))
+	          return
+	        }
+	        var options = {
+	          status: status,
+	          statusText: xhr.statusText,
+	          headers: headers(xhr),
+	          url: responseURL()
+	        }
+	        var body = 'response' in xhr ? xhr.response : xhr.responseText;
+	        resolve(new Response(body, options))
+	      }
+	
+	      xhr.onerror = function() {
+	        reject(new TypeError('Network request failed'))
+	      }
+	
+	      xhr.open(request.method, request.url, true)
+	
+	      if (request.credentials === 'include') {
+	        xhr.withCredentials = true
+	      }
+	
+	      if ('responseType' in xhr && support.blob) {
+	        xhr.responseType = 'blob'
+	      }
+	
+	      request.headers.forEach(function(value, name) {
+	        xhr.setRequestHeader(name, value)
+	      })
+	
+	      xhr.send(typeof request._bodyInit === 'undefined' ? null : request._bodyInit)
+	    })
+	  }
+	  self.fetch.polyfill = true
+	})(typeof self !== 'undefined' ? self : this);
+
+
+/***/ },
+/* 231 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	var _react = __webpack_require__(235);
+	
+	var _react2 = _interopRequireDefault(_react);
+	
+	var _bootstrapMin = __webpack_require__(1);
+	
+	var bootstrap = _interopRequireWildcard(_bootstrapMin);
+	
+	var _CommentsList = __webpack_require__(241);
+	
+	var _CommentsList2 = _interopRequireDefault(_CommentsList);
+	
+	var _Comment = __webpack_require__(243);
+	
+	var _Comment2 = _interopRequireDefault(_Comment);
+	
+	var _helpers = __webpack_require__(232);
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+	
+	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+	
+	var CommentsList = function (_Component) {
+	  _inherits(CommentsList, _Component);
+	
+	  function CommentsList(props) {
+	    _classCallCheck(this, CommentsList);
+	
+	    var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(CommentsList).call(this, props));
+	
+	    var state = props.state;
+	    var socket = props.socket;
+	
+	
+	    (0, _helpers.run)(state.map((0, _helpers.on)('update', function (e) {
+	      return _this.setState(e.data.currentData);
+	    })).flatMap(function (state) {
+	      return socket.map((0, _helpers.on)('comments', function (comments) {
+	        return state.select('comments').merge(comments);
+	      }));
+	    }));
+	    return _this;
+	  }
+	
+	  _createClass(CommentsList, [{
+	    key: 'comments',
+	    value: function comments(f) {
+	      var state = this.props.state;
+	
+	
+	      return (0, _helpers.extract)((0, _helpers.perform)(state.map(function (state) {
+	        return f(state.get('comments'));
+	      })));
+	    }
+	  }, {
+	    key: 'renderComments',
+	    value: function renderComments() {
+	      var comments = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
+	
+	
+	      return Object.keys(comments).length > 0 ? _react2.default.createElement(
+	        'ul',
+	        { className: _CommentsList2.default.list },
+	        (0, _helpers.top)((0, _helpers.map)(function (comment) {
+	          return _react2.default.createElement(_Comment2.default, { key: comment.id, comment: comment });
+	        }, (0, _helpers.sort)((0, _helpers.toArray)(comments), 'created'), 100))
+	      ) : _react2.default.createElement('ul', { className: _CommentsList2.default.list });
+	    }
+	  }, {
+	    key: 'render',
+	    value: function render() {
+	      return _react2.default.createElement(
+	        'div',
+	        { className: bootstrap.container },
+	        _react2.default.createElement(
+	          'div',
+	          { className: bootstrap.row },
+	          _react2.default.createElement(
+	            'div',
+	            { className: _CommentsList2.default.container },
+	            this.comments(this.renderComments)
+	          )
+	        )
+	      );
+	    }
+	  }]);
+	
+	  return CommentsList;
+	}(_react.Component);
+	
+	CommentsList.propTypes = {
+	  socket: _react.PropTypes.any.isRequired,
+	  state: _react.PropTypes.any.isRequired
+	};
+	
+	exports.default = function (_ref) {
+	  var socket = _ref.socket;
+	  var state = _ref.state;
+	  return _react2.default.createElement(CommentsList, { socket: socket, state: state });
+	};
+
+/***/ },
+/* 232 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.ok = exports.updateState = exports.log = exports.stringify = exports.render = exports.emit = exports.on = exports.seedState = exports.middleware = exports.listen = exports.post = exports.perform = exports.get = exports.json = exports.merge = exports.set = exports.select = exports.toJson = exports.toArray = exports.repeat = exports.run = exports.previousData = exports.currentData = exports.map = exports.extract = exports.sort = exports.top = exports.call = undefined;
+	exports.thunk = thunk;
+	exports.pluck = pluck;
+	exports.diff = diff;
+	
+	var _shallowDiff2 = __webpack_require__(233);
+	
+	var _shallowDiff3 = _interopRequireDefault(_shallowDiff2);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+	
+	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+	
+	function thunk(x) {
+	  return function () {
+	    return x;
+	  };
+	}
+	var call = exports.call = function call(verb) {
+	  for (var _len = arguments.length, firstArgs = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	    firstArgs[_key - 1] = arguments[_key];
+	  }
+	
+	  return function () {
+	    for (var _len2 = arguments.length, secondArgs = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+	      secondArgs[_key2] = arguments[_key2];
+	    }
+	
+	    return function (app) {
+	      app[verb].apply(app, _toConsumableArray(firstArgs.concat(secondArgs)));
+	      return app;
+	    };
+	  };
+	};
+	function pluck(path) {
+	  return function plucked(obj) {
+	    return obj[path];
+	  };
+	}
+	var top = exports.top = function top(arr, num) {
+	  return arr.slice(0, num);
+	};
+	var sort = exports.sort = function sort(arr, by) {
+	  return arr.sort(function (x, y) {
+	    return x[by] - y[by];
+	  });
+	};
+	var extract = exports.extract = pluck('value');
+	var map = exports.map = function map(f, x) {
+	  return Array.isArray(x) ? x.map(f) : Object.keys(x).map(function (k) {
+	    return f(x[k]);
+	  });
+	};
+	var currentData = exports.currentData = function currentData(thing) {
+	  return pluck('currentData')(pluck('data')(thing));
+	};
+	var previousData = exports.previousData = function previousData(thing) {
+	  return pluck('previousData')(pluck('data')(thing));
+	};
+	var run = exports.run = function run() {
+	  for (var _len3 = arguments.length, IOs = Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+	    IOs[_key3] = arguments[_key3];
+	  }
+	
+	  return IOs.forEach(function (io) {
+	    return io.perform();
+	  });
+	};
+	var repeat = exports.repeat = function repeat(io) {
+	  return {
+	    every: function every(time) {
+	      return io.map(function () {
+	        return setInterval(function () {
+	          return run(io);
+	        }, time);
+	      });
+	    }
+	  };
+	};
+	var toArray = exports.toArray = function toArray(obj) {
+	  return Object.keys(obj).map(function (k) {
+	    return obj[k];
+	  });
+	};
+	var toJson = exports.toJson = function toJson(pr) {
+	  return pr.json();
+	};
+	var select = exports.select = call('select');
+	var set = exports.set = call('set');
+	var merge = exports.merge = call('merge');
+	var json = exports.json = call('json');
+	var get = exports.get = call('get');
+	var perform = exports.perform = call('perform')();
+	var post = exports.post = call('post');
+	var listen = exports.listen = call('listen');
+	var middleware = exports.middleware = call('middleware');
+	var seedState = exports.seedState = call('seedState');
+	var on = exports.on = call('on');
+	var emit = exports.emit = call('emit');
+	var render = exports.render = call('render');
+	var stringify = exports.stringify = call('stringify');
+	var log = exports.log = call('log');
+	var updateState = exports.updateState = call('updateState');
+	var ok = exports.ok = thunk({ ok: 'ok' });
+	function diff(one, two) {
+	  var _shallowDiff = (0, _shallowDiff3.default)(one, two);
+	
+	  var added = _shallowDiff.added;
+	
+	
+	  return added.reduce(function (obj, key) {
+	    return Object.assign({}, obj, _defineProperty({}, key, two[key]));
+	  }, {});
+	}
+
+/***/ },
+/* 233 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * @license shallow-diff https://github.com/cosmosio/shallow-diff
+	 *
+	 * The MIT License (MIT)
+	 *
+	 * Copyright (c) 2014-2015 Olivier Scherrer <pode.fr@gmail.com>
+	 */
+	"use strict";
+	
+	function assert(assertion, error) {
+	    if (assertion) {
+	        throw new TypeError("simple-loop: " + error);
+	    }
+	}
+	
+	var loop = __webpack_require__(234);
+	
+	/**
+	 * Make a diff between two objects
+	 * @param {Array/Object} base the base object
+	 * @param {Array/Object} compared the object to compare the base with
+	 * @example:
+	 *  With objects:
+	 *
+	 *  base = {a:1, b:2, c:3, d:4, f:6}
+	 *  compared = {a:1, b:20, d: 4, e: 5}
+	 *  will return :
+	 *  {
+	 *      unchanged: ["a", "d"],
+	 *      updated: ["b"],
+	 *      deleted: ["f"],
+	 *      added: ["e"]
+	 *  }
+	 *
+	 * It also works with Arrays:
+	 *
+	 *  base = [10, 20, 30]
+	 *  compared = [15, 20]
+	 *  will return :
+	 *  {
+	 *      unchanged: [1],
+	 *      updated: [0],
+	 *      deleted: [2],
+	 *      added: []
+	 *  }
+	 *
+	 * @returns object
+	 */
+	module.exports = function shallowDiff(base, compared) {
+	    assert(typeof base != "object", "the first object to compare with shallowDiff needs to be an object");
+	    assert(typeof compared != "object", "the second object to compare with shallowDiff needs to be an object");
+	
+	    var unchanged = [],
+	        updated = [],
+	        deleted = [],
+	        added = [];
+	
+	    // Loop through the compared object
+	    loop(compared, function(value, idx) {
+	        // To get the added items
+	        if (!(idx in base)) {
+	            added.push(idx);
+	
+	        // The updated items
+	        } else if (value !== base[idx]) {
+	            updated.push(idx);
+	
+	        // And the unchanged
+	        } else if (value === base[idx]) {
+	            unchanged.push(idx);
+	        }
+	    });
+	
+	    // Loop through the before object
+	    loop(base, function(value, idx) {
+	        // To get the deleted items
+	        if (!(idx in compared)) {
+	            deleted.push(idx);
+	        }
+	    });
+	
+	    return {
+	        updated: updated,
+	        unchanged: unchanged,
+	        added: added,
+	        deleted: deleted
+	    };
+	};
+
+
+/***/ },
+/* 234 */
+/***/ function(module, exports) {
+
+	/**
+	 * @license simple-loop https://github.com/flams/simple-loop
+	 *
+	 * The MIT License (MIT)
+	 *
+	 * Copyright (c) 2014-2015 Olivier Scherrer <pode.fr@gmail.com>
+	 */
+	"use strict";
+	
+	function assert(assertion, error) {
+	    if (assertion) {
+	        throw new TypeError("simple-loop: " + error);
+	    }
+	}
+	
+	/**
+	 * Small abstraction for looping over objects and arrays
+	 * Warning: it's not meant to be used with nodeList
+	 * To use with nodeList, convert to array first
+	 * @param {Array/Object} iterated the array or object to loop through
+	 * @param {Function} callback the function to execute for each iteration
+	 * @param {Object} scope the scope in which to execute the callback
+	 */
+	module.exports = function loop(iterated, callback, scope) {
+	    assert(typeof iterated != "object", "iterated must be an array/object");
+	    assert(typeof callback != "function", "callback must be a function");
+	
+	    var i;
+	
+	    if (Array.isArray(iterated)) {
+	        for (i = 0; i < iterated.length; i++) {
+	            callback.call(scope, iterated[i], i, iterated);
+	        }
+	    } else {
+	        for (i in iterated) {
+	            if (iterated.hasOwnProperty(i)) {
+	                callback.call(scope, iterated[i], i, iterated);
+	            }
+	        }
+	    }
+	};
+
+
+/***/ },
+/* 235 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	module.exports = __webpack_require__(236);
+
+
+/***/ },
+/* 236 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Copyright 2013-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * @providesModule React
+	 */
+	
+	'use strict';
+	
+	var _assign = __webpack_require__(31);
+	
+	var ReactChildren = __webpack_require__(105);
+	var ReactComponent = __webpack_require__(134);
+	var ReactClass = __webpack_require__(133);
+	var ReactDOMFactories = __webpack_require__(237);
+	var ReactElement = __webpack_require__(98);
+	var ReactElementValidator = __webpack_require__(238);
+	var ReactPropTypes = __webpack_require__(97);
+	var ReactVersion = __webpack_require__(166);
+	
+	var onlyChild = __webpack_require__(240);
+	var warning = __webpack_require__(25);
+	
+	var createElement = ReactElement.createElement;
+	var createFactory = ReactElement.createFactory;
+	var cloneElement = ReactElement.cloneElement;
+	
+	if (true) {
+	  createElement = ReactElementValidator.createElement;
+	  createFactory = ReactElementValidator.createFactory;
+	  cloneElement = ReactElementValidator.cloneElement;
+	}
+	
+	var __spread = _assign;
+	
+	if (true) {
+	  var warned = false;
+	  __spread = function () {
+	     true ? warning(warned, 'React.__spread is deprecated and should not be used. Use ' + 'Object.assign directly or another helper function with similar ' + 'semantics. You may be seeing this warning due to your compiler. ' + 'See https://fb.me/react-spread-deprecation for more details.') : void 0;
+	    warned = true;
+	    return _assign.apply(null, arguments);
+	  };
+	}
+	
+	var React = {
+	
+	  // Modern
+	
+	  Children: {
+	    map: ReactChildren.map,
+	    forEach: ReactChildren.forEach,
+	    count: ReactChildren.count,
+	    toArray: ReactChildren.toArray,
+	    only: onlyChild
+	  },
+	
+	  Component: ReactComponent,
+	
+	  createElement: createElement,
+	  cloneElement: cloneElement,
+	  isValidElement: ReactElement.isValidElement,
+	
+	  // Classic
+	
+	  PropTypes: ReactPropTypes,
+	  createClass: ReactClass.createClass,
+	  createFactory: createFactory,
+	  createMixin: function (mixin) {
+	    // Currently a noop. Will be used to validate and trace mixins.
+	    return mixin;
+	  },
+	
+	  // This looks DOM specific but these are actually isomorphic helpers
+	  // since they are just generating DOM strings.
+	  DOM: ReactDOMFactories,
+	
+	  version: ReactVersion,
+	
+	  // Deprecated hook for JSX spread, don't use this for anything.
+	  __spread: __spread
+	};
+	
+	module.exports = React;
+
+/***/ },
+/* 237 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Copyright 2013-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * @providesModule ReactDOMFactories
+	 */
+	
+	'use strict';
+	
+	var ReactElement = __webpack_require__(98);
+	var ReactElementValidator = __webpack_require__(238);
+	
+	var mapObject = __webpack_require__(239);
+	
+	/**
+	 * Create a factory that creates HTML tag elements.
+	 *
+	 * @param {string} tag Tag name (e.g. `div`).
+	 * @private
+	 */
+	function createDOMFactory(tag) {
+	  if (true) {
+	    return ReactElementValidator.createFactory(tag);
+	  }
+	  return ReactElement.createFactory(tag);
+	}
+	
+	/**
+	 * Creates a mapping from supported HTML tags to `ReactDOMComponent` classes.
+	 * This is also accessible via `React.DOM`.
+	 *
+	 * @public
+	 */
+	var ReactDOMFactories = mapObject({
+	  a: 'a',
+	  abbr: 'abbr',
+	  address: 'address',
+	  area: 'area',
+	  article: 'article',
+	  aside: 'aside',
+	  audio: 'audio',
+	  b: 'b',
+	  base: 'base',
+	  bdi: 'bdi',
+	  bdo: 'bdo',
+	  big: 'big',
+	  blockquote: 'blockquote',
+	  body: 'body',
+	  br: 'br',
+	  button: 'button',
+	  canvas: 'canvas',
+	  caption: 'caption',
+	  cite: 'cite',
+	  code: 'code',
+	  col: 'col',
+	  colgroup: 'colgroup',
+	  data: 'data',
+	  datalist: 'datalist',
+	  dd: 'dd',
+	  del: 'del',
+	  details: 'details',
+	  dfn: 'dfn',
+	  dialog: 'dialog',
+	  div: 'div',
+	  dl: 'dl',
+	  dt: 'dt',
+	  em: 'em',
+	  embed: 'embed',
+	  fieldset: 'fieldset',
+	  figcaption: 'figcaption',
+	  figure: 'figure',
+	  footer: 'footer',
+	  form: 'form',
+	  h1: 'h1',
+	  h2: 'h2',
+	  h3: 'h3',
+	  h4: 'h4',
+	  h5: 'h5',
+	  h6: 'h6',
+	  head: 'head',
+	  header: 'header',
+	  hgroup: 'hgroup',
+	  hr: 'hr',
+	  html: 'html',
+	  i: 'i',
+	  iframe: 'iframe',
+	  img: 'img',
+	  input: 'input',
+	  ins: 'ins',
+	  kbd: 'kbd',
+	  keygen: 'keygen',
+	  label: 'label',
+	  legend: 'legend',
+	  li: 'li',
+	  link: 'link',
+	  main: 'main',
+	  map: 'map',
+	  mark: 'mark',
+	  menu: 'menu',
+	  menuitem: 'menuitem',
+	  meta: 'meta',
+	  meter: 'meter',
+	  nav: 'nav',
+	  noscript: 'noscript',
+	  object: 'object',
+	  ol: 'ol',
+	  optgroup: 'optgroup',
+	  option: 'option',
+	  output: 'output',
+	  p: 'p',
+	  param: 'param',
+	  picture: 'picture',
+	  pre: 'pre',
+	  progress: 'progress',
+	  q: 'q',
+	  rp: 'rp',
+	  rt: 'rt',
+	  ruby: 'ruby',
+	  s: 's',
+	  samp: 'samp',
+	  script: 'script',
+	  section: 'section',
+	  select: 'select',
+	  small: 'small',
+	  source: 'source',
+	  span: 'span',
+	  strong: 'strong',
+	  style: 'style',
+	  sub: 'sub',
+	  summary: 'summary',
+	  sup: 'sup',
+	  table: 'table',
+	  tbody: 'tbody',
+	  td: 'td',
+	  textarea: 'textarea',
+	  tfoot: 'tfoot',
+	  th: 'th',
+	  thead: 'thead',
+	  time: 'time',
+	  title: 'title',
+	  tr: 'tr',
+	  track: 'track',
+	  u: 'u',
+	  ul: 'ul',
+	  'var': 'var',
+	  video: 'video',
+	  wbr: 'wbr',
+	
+	  // SVG
+	  circle: 'circle',
+	  clipPath: 'clipPath',
+	  defs: 'defs',
+	  ellipse: 'ellipse',
+	  g: 'g',
+	  image: 'image',
+	  line: 'line',
+	  linearGradient: 'linearGradient',
+	  mask: 'mask',
+	  path: 'path',
+	  pattern: 'pattern',
+	  polygon: 'polygon',
+	  polyline: 'polyline',
+	  radialGradient: 'radialGradient',
+	  rect: 'rect',
+	  stop: 'stop',
+	  svg: 'svg',
+	  text: 'text',
+	  tspan: 'tspan'
+	
+	}, createDOMFactory);
+	
+	module.exports = ReactDOMFactories;
+
+/***/ },
+/* 238 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Copyright 2014-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * @providesModule ReactElementValidator
+	 */
+	
+	/**
+	 * ReactElementValidator provides a wrapper around a element factory
+	 * which validates the props passed to the element. This is intended to be
+	 * used only in DEV and could be replaced by a static type checker for languages
+	 * that support it.
+	 */
+	
+	'use strict';
+	
+	var ReactElement = __webpack_require__(98);
+	var ReactPropTypeLocations = __webpack_require__(103);
+	var ReactPropTypeLocationNames = __webpack_require__(101);
+	var ReactCurrentOwner = __webpack_require__(99);
+	
+	var canDefineProperty = __webpack_require__(100);
+	var getIteratorFn = __webpack_require__(102);
+	var invariant = __webpack_require__(14);
+	var warning = __webpack_require__(25);
+	
+	function getDeclarationErrorAddendum() {
+	  if (ReactCurrentOwner.current) {
+	    var name = ReactCurrentOwner.current.getName();
+	    if (name) {
+	      return ' Check the render method of `' + name + '`.';
+	    }
+	  }
+	  return '';
+	}
+	
+	/**
+	 * Warn if there's no key explicitly set on dynamic arrays of children or
+	 * object keys are not valid. This allows us to keep track of children between
+	 * updates.
+	 */
+	var ownerHasKeyUseWarning = {};
+	
+	var loggedTypeFailures = {};
+	
+	/**
+	 * Warn if the element doesn't have an explicit key assigned to it.
+	 * This element is in an array. The array could grow and shrink or be
+	 * reordered. All children that haven't already been validated are required to
+	 * have a "key" property assigned to it.
+	 *
+	 * @internal
+	 * @param {ReactElement} element Element that requires a key.
+	 * @param {*} parentType element's parent's type.
+	 */
+	function validateExplicitKey(element, parentType) {
+	  if (!element._store || element._store.validated || element.key != null) {
+	    return;
+	  }
+	  element._store.validated = true;
+	
+	  var addenda = getAddendaForKeyUse('uniqueKey', element, parentType);
+	  if (addenda === null) {
+	    // we already showed the warning
+	    return;
+	  }
+	   true ? warning(false, 'Each child in an array or iterator should have a unique "key" prop.' + '%s%s%s', addenda.parentOrOwner || '', addenda.childOwner || '', addenda.url || '') : void 0;
+	}
+	
+	/**
+	 * Shared warning and monitoring code for the key warnings.
+	 *
+	 * @internal
+	 * @param {string} messageType A key used for de-duping warnings.
+	 * @param {ReactElement} element Component that requires a key.
+	 * @param {*} parentType element's parent's type.
+	 * @returns {?object} A set of addenda to use in the warning message, or null
+	 * if the warning has already been shown before (and shouldn't be shown again).
+	 */
+	function getAddendaForKeyUse(messageType, element, parentType) {
+	  var addendum = getDeclarationErrorAddendum();
+	  if (!addendum) {
+	    var parentName = typeof parentType === 'string' ? parentType : parentType.displayName || parentType.name;
+	    if (parentName) {
+	      addendum = ' Check the top-level render call using <' + parentName + '>.';
+	    }
+	  }
+	
+	  var memoizer = ownerHasKeyUseWarning[messageType] || (ownerHasKeyUseWarning[messageType] = {});
+	  if (memoizer[addendum]) {
+	    return null;
+	  }
+	  memoizer[addendum] = true;
+	
+	  var addenda = {
+	    parentOrOwner: addendum,
+	    url: ' See https://fb.me/react-warning-keys for more information.',
+	    childOwner: null
+	  };
+	
+	  // Usually the current owner is the offender, but if it accepts children as a
+	  // property, it may be the creator of the child that's responsible for
+	  // assigning it a key.
+	  if (element && element._owner && element._owner !== ReactCurrentOwner.current) {
+	    // Give the component that originally created this child.
+	    addenda.childOwner = ' It was passed a child from ' + element._owner.getName() + '.';
+	  }
+	
+	  return addenda;
+	}
+	
+	/**
+	 * Ensure that every element either is passed in a static location, in an
+	 * array with an explicit keys property defined, or in an object literal
+	 * with valid key property.
+	 *
+	 * @internal
+	 * @param {ReactNode} node Statically passed child of any type.
+	 * @param {*} parentType node's parent's type.
+	 */
+	function validateChildKeys(node, parentType) {
+	  if (typeof node !== 'object') {
+	    return;
+	  }
+	  if (Array.isArray(node)) {
+	    for (var i = 0; i < node.length; i++) {
+	      var child = node[i];
+	      if (ReactElement.isValidElement(child)) {
+	        validateExplicitKey(child, parentType);
+	      }
+	    }
+	  } else if (ReactElement.isValidElement(node)) {
+	    // This element was passed in a valid location.
+	    if (node._store) {
+	      node._store.validated = true;
+	    }
+	  } else if (node) {
+	    var iteratorFn = getIteratorFn(node);
+	    // Entry iterators provide implicit keys.
+	    if (iteratorFn) {
+	      if (iteratorFn !== node.entries) {
+	        var iterator = iteratorFn.call(node);
+	        var step;
+	        while (!(step = iterator.next()).done) {
+	          if (ReactElement.isValidElement(step.value)) {
+	            validateExplicitKey(step.value, parentType);
+	          }
+	        }
+	      }
+	    }
+	  }
+	}
+	
+	/**
+	 * Assert that the props are valid
+	 *
+	 * @param {string} componentName Name of the component for error messages.
+	 * @param {object} propTypes Map of prop name to a ReactPropType
+	 * @param {object} props
+	 * @param {string} location e.g. "prop", "context", "child context"
+	 * @private
+	 */
+	function checkPropTypes(componentName, propTypes, props, location) {
+	  for (var propName in propTypes) {
+	    if (propTypes.hasOwnProperty(propName)) {
+	      var error;
+	      // Prop type validation may throw. In case they do, we don't want to
+	      // fail the render phase where it didn't fail before. So we log it.
+	      // After these have been cleaned up, we'll let them throw.
+	      try {
+	        // This is intentionally an invariant that gets caught. It's the same
+	        // behavior as without this statement except with a better message.
+	        !(typeof propTypes[propName] === 'function') ?  true ? invariant(false, '%s: %s type `%s` is invalid; it must be a function, usually from ' + 'React.PropTypes.', componentName || 'React class', ReactPropTypeLocationNames[location], propName) : invariant(false) : void 0;
+	        error = propTypes[propName](props, propName, componentName, location);
+	      } catch (ex) {
+	        error = ex;
+	      }
+	       true ? warning(!error || error instanceof Error, '%s: type specification of %s `%s` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a %s. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).', componentName || 'React class', ReactPropTypeLocationNames[location], propName, typeof error) : void 0;
+	      if (error instanceof Error && !(error.message in loggedTypeFailures)) {
+	        // Only monitor this failure once because there tends to be a lot of the
+	        // same error.
+	        loggedTypeFailures[error.message] = true;
+	
+	        var addendum = getDeclarationErrorAddendum();
+	         true ? warning(false, 'Failed propType: %s%s', error.message, addendum) : void 0;
+	      }
+	    }
+	  }
+	}
+	
+	/**
+	 * Given an element, validate that its props follow the propTypes definition,
+	 * provided by the type.
+	 *
+	 * @param {ReactElement} element
+	 */
+	function validatePropTypes(element) {
+	  var componentClass = element.type;
+	  if (typeof componentClass !== 'function') {
+	    return;
+	  }
+	  var name = componentClass.displayName || componentClass.name;
+	  if (componentClass.propTypes) {
+	    checkPropTypes(name, componentClass.propTypes, element.props, ReactPropTypeLocations.prop);
+	  }
+	  if (typeof componentClass.getDefaultProps === 'function') {
+	     true ? warning(componentClass.getDefaultProps.isReactClassApproved, 'getDefaultProps is only used on classic React.createClass ' + 'definitions. Use a static property named `defaultProps` instead.') : void 0;
+	  }
+	}
+	
+	var ReactElementValidator = {
+	
+	  createElement: function (type, props, children) {
+	    var validType = typeof type === 'string' || typeof type === 'function';
+	    // We warn in this case but don't throw. We expect the element creation to
+	    // succeed and there will likely be errors in render.
+	     true ? warning(validType, 'React.createElement: type should not be null, undefined, boolean, or ' + 'number. It should be a string (for DOM elements) or a ReactClass ' + '(for composite components).%s', getDeclarationErrorAddendum()) : void 0;
+	
+	    var element = ReactElement.createElement.apply(this, arguments);
+	
+	    // The result can be nullish if a mock or a custom function is used.
+	    // TODO: Drop this when these are no longer allowed as the type argument.
+	    if (element == null) {
+	      return element;
+	    }
+	
+	    // Skip key warning if the type isn't valid since our key validation logic
+	    // doesn't expect a non-string/function type and can throw confusing errors.
+	    // We don't want exception behavior to differ between dev and prod.
+	    // (Rendering will throw with a helpful message and as soon as the type is
+	    // fixed, the key warnings will appear.)
+	    if (validType) {
+	      for (var i = 2; i < arguments.length; i++) {
+	        validateChildKeys(arguments[i], type);
+	      }
+	    }
+	
+	    validatePropTypes(element);
+	
+	    return element;
+	  },
+	
+	  createFactory: function (type) {
+	    var validatedFactory = ReactElementValidator.createElement.bind(null, type);
+	    // Legacy hook TODO: Warn if this is accessed
+	    validatedFactory.type = type;
+	
+	    if (true) {
+	      if (canDefineProperty) {
+	        Object.defineProperty(validatedFactory, 'type', {
+	          enumerable: false,
+	          get: function () {
+	             true ? warning(false, 'Factory.type is deprecated. Access the class directly ' + 'before passing it to createFactory.') : void 0;
+	            Object.defineProperty(this, 'type', {
+	              value: type
+	            });
+	            return type;
+	          }
+	        });
+	      }
+	    }
+	
+	    return validatedFactory;
+	  },
+	
+	  cloneElement: function (element, props, children) {
+	    var newElement = ReactElement.cloneElement.apply(this, arguments);
+	    for (var i = 2; i < arguments.length; i++) {
+	      validateChildKeys(arguments[i], newElement.type);
+	    }
+	    validatePropTypes(newElement);
+	    return newElement;
+	  }
+	
+	};
+	
+	module.exports = ReactElementValidator;
+
+/***/ },
+/* 239 */
+/***/ function(module, exports) {
+
+	/**
+	 * Copyright (c) 2013-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 */
+	
+	'use strict';
+	
+	var hasOwnProperty = Object.prototype.hasOwnProperty;
+	
+	/**
+	 * Executes the provided `callback` once for each enumerable own property in the
+	 * object and constructs a new object from the results. The `callback` is
+	 * invoked with three arguments:
+	 *
+	 *  - the property value
+	 *  - the property name
+	 *  - the object being traversed
+	 *
+	 * Properties that are added after the call to `mapObject` will not be visited
+	 * by `callback`. If the values of existing properties are changed, the value
+	 * passed to `callback` will be the value at the time `mapObject` visits them.
+	 * Properties that are deleted before being visited are not visited.
+	 *
+	 * @grep function objectMap()
+	 * @grep function objMap()
+	 *
+	 * @param {?object} object
+	 * @param {function} callback
+	 * @param {*} context
+	 * @return {?object}
+	 */
+	function mapObject(object, callback, context) {
+	  if (!object) {
+	    return null;
+	  }
+	  var result = {};
+	  for (var name in object) {
+	    if (hasOwnProperty.call(object, name)) {
+	      result[name] = callback.call(context, object[name], name, object);
+	    }
+	  }
+	  return result;
+	}
+	
+	module.exports = mapObject;
+
+/***/ },
+/* 240 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * Copyright 2013-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * @providesModule onlyChild
+	 */
+	'use strict';
+	
+	var ReactElement = __webpack_require__(98);
+	
+	var invariant = __webpack_require__(14);
+	
+	/**
+	 * Returns the first child in a collection of children and verifies that there
+	 * is only one child in the collection. The current implementation of this
+	 * function assumes that a single child gets passed without a wrapper, but the
+	 * purpose of this helper function is to abstract away the particular structure
+	 * of children.
+	 *
+	 * @param {?object} children Child collection structure.
+	 * @return {ReactElement} The first and only `ReactElement` contained in the
+	 * structure.
+	 */
+	function onlyChild(children) {
+	  !ReactElement.isValidElement(children) ?  true ? invariant(false, 'onlyChild must be passed a children with exactly one child.') : invariant(false) : void 0;
+	  return children;
+	}
+	
+	module.exports = onlyChild;
+
+/***/ },
+/* 241 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// style-loader: Adds some css to the DOM by adding a <style> tag
+	
+	// load the styles
+	var content = __webpack_require__(242);
+	if(typeof content === 'string') content = [[module.id, content, '']];
+	// add the styles to the DOM
+	var update = __webpack_require__(9)(content, {});
+	if(content.locals) module.exports = content.locals;
+	// Hot Module Replacement
+	if(false) {
+		// When the styles change, update the <style> tags
+		if(!content.locals) {
+			module.hot.accept("!!./../../node_modules/css-loader/index.js?modules&sourceMap&localIdentName=[name]__[local]___[hash:base64:5]!./CommentsList.css", function() {
+				var newContent = require("!!./../../node_modules/css-loader/index.js?modules&sourceMap&localIdentName=[name]__[local]___[hash:base64:5]!./CommentsList.css");
+				if(typeof newContent === 'string') newContent = [[module.id, newContent, '']];
+				update(newContent);
+			});
+		}
+		// When the module is disposed, remove the <style> tags
+		module.hot.dispose(function() { update(); });
+	}
+
+/***/ },
+/* 242 */
+/***/ function(module, exports, __webpack_require__) {
+
+	exports = module.exports = __webpack_require__(3)();
+	// imports
+	exports.i(__webpack_require__(2), undefined);
+	
+	// module
+	exports.push([module.id, ".CommentsList__container___1DULv {\n  padding-top: 60px;\n}\n\n.CommentsList__list___AAaBr {\n}\n", "", {"version":3,"sources":["/./src/client/CommentsList.css"],"names":[],"mappings":"AAAA;EAEE,kBAAkB;CACnB;;AAED;CAEC","file":"CommentsList.css","sourcesContent":[".container {\n  composes: col-xs-12 from 'bootstrap/dist/css/bootstrap.min.css';\n  padding-top: 60px;\n}\n\n.list {\n  composes: list-unstyled from 'bootstrap/dist/css/bootstrap.min.css';\n}\n"],"sourceRoot":"webpack://"}]);
+	
+	// exports
+	exports.locals = {
+		"container": "CommentsList__container___1DULv " + __webpack_require__(2).locals["col-xs-12"] + "",
+		"list": "CommentsList__list___AAaBr " + __webpack_require__(2).locals["list-unstyled"] + ""
+	};
+
+/***/ },
+/* 243 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	var _react = __webpack_require__(235);
+	
+	var _react2 = _interopRequireDefault(_react);
+	
+	var _bootstrapMin = __webpack_require__(1);
+	
+	var bootstrap = _interopRequireWildcard(_bootstrapMin);
+	
+	var _Comment = __webpack_require__(244);
+	
+	var _Comment2 = _interopRequireDefault(_Comment);
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+	
+	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+	
+	var Comment = function (_Component) {
+	  _inherits(Comment, _Component);
+	
+	  function Comment() {
+	    _classCallCheck(this, Comment);
+	
+	    return _possibleConstructorReturn(this, Object.getPrototypeOf(Comment).apply(this, arguments));
+	  }
+	
+	  _createClass(Comment, [{
+	    key: 'nsfw',
+	    value: function nsfw(comment) {
+	      return comment.nsfw ? _react2.default.createElement(
+	        'div',
+	        { className: _Comment2.default.nsfw },
+	        'NSFW'
+	      ) : null;
+	    }
+	  }, {
+	    key: 'nsfwBody',
+	    value: function nsfwBody(comment) {
+	      return comment.nsfw ? _Comment2.default.nsfwBody : _Comment2.default.body;
+	    }
+	  }, {
+	    key: 'render',
+	    value: function render() {
+	      var comment = this.props.comment;
+	
+	
+	      return _react2.default.createElement(
+	        'a',
+	        { href: comment.link, target: '_blank', className: _Comment2.default.link },
+	        _react2.default.createElement(
+	          'div',
+	          { className: _Comment2.default.comment },
+	          this.nsfw(comment),
+	          _react2.default.createElement(
+	            'div',
+	            { className: _Comment2.default.heading },
+	            _react2.default.createElement(
+	              'h3',
+	              { className: _Comment2.default.title },
+	              comment.author,
+	              ' says...'
+	            )
+	          ),
+	          _react2.default.createElement(
+	            'div',
+	            { className: this.nsfwBody(comment) },
+	            comment.body
+	          )
+	        )
+	      );
+	    }
+	  }]);
+	
+	  return Comment;
+	}(_react.Component);
+	
+	exports.default = Comment;
+
+/***/ },
+/* 244 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// style-loader: Adds some css to the DOM by adding a <style> tag
+	
+	// load the styles
+	var content = __webpack_require__(245);
+	if(typeof content === 'string') content = [[module.id, content, '']];
+	// add the styles to the DOM
+	var update = __webpack_require__(9)(content, {});
+	if(content.locals) module.exports = content.locals;
+	// Hot Module Replacement
+	if(false) {
+		// When the styles change, update the <style> tags
+		if(!content.locals) {
+			module.hot.accept("!!./../../node_modules/css-loader/index.js?modules&sourceMap&localIdentName=[name]__[local]___[hash:base64:5]!./Comment.css", function() {
+				var newContent = require("!!./../../node_modules/css-loader/index.js?modules&sourceMap&localIdentName=[name]__[local]___[hash:base64:5]!./Comment.css");
+				if(typeof newContent === 'string') newContent = [[module.id, newContent, '']];
+				update(newContent);
+			});
+		}
+		// When the module is disposed, remove the <style> tags
+		module.hot.dispose(function() { update(); });
+	}
+
+/***/ },
+/* 245 */
+/***/ function(module, exports, __webpack_require__) {
+
+	exports = module.exports = __webpack_require__(3)();
+	// imports
+	exports.i(__webpack_require__(2), undefined);
+	
+	// module
+	exports.push([module.id, ".Comment__link___V6Iif {\n  color: inherit;\n}\n\n.Comment__link___V6Iif:hover {\n  text-decoration: none;\n  color: inherit;\n}\n\n.Comment__comment____RZh8:hover{\n  box-shadow: 5px 5px 2.5px 0px rgba(0, 0, 0, 0.25);\n  transform: scale(1.2);\n  z-index: 1;\n}\n\n.Comment__comment____RZh8 {\n  box-shadow: 0 0px 0px rgba(0,0,0,0);\n  transition: all 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);;\n  position: relative;\n}\n\n.Comment__nsfw___d9LI4 {\n  position: absolute;\n  top: 5px;\n  right: 10px;\n}\n\n.Comment__heading___39KgZ {\n}\n\n.Comment__title___2srDr {\n}\n\n.Comment__body___jc_fZ {\n}\n\n.Comment__nsfwBody___3bNdX {\n  -webkit-filter: blur(5px);\n  -moz-filter: blur(5px);\n  -o-filter: blur(5px);\n  -ms-filter: blur(5px);\n  filter: blur(5px);\n  transition: all 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);;\n  opacity: 0.9;\n}\n\n.Comment__nsfwBody___3bNdX:hover {\n  -webkit-filter: blur(0);\n  -moz-filter: blur(0);\n  -o-filter: blur(0);\n  -ms-filter: blur(0);\n  filter: blur(0);\n  opacity: 1;\n}\n", "", {"version":3,"sources":["/./src/client/Comment.css"],"names":[],"mappings":"AAAA;EACE,eAAe;CAChB;;AAED;EACE,sBAAsB;EACtB,eAAe;CAChB;;AAED;EACE,kDAAkD;EAClD,sBAAsB;EACtB,WAAW;CACZ;;AAED;EAEE,oCAAoC;EACpC,wDAAwD;EACxD,mBAAmB;CACpB;;AAED;EAEE,mBAAmB;EACnB,SAAS;EACT,YAAY;CACb;;AAED;CAEC;;AAED;CAEC;;AAED;CAEC;;AAED;EAEE,0BAA0B;EAC1B,uBAAuB;EACvB,qBAAqB;EACrB,sBAAsB;EACtB,kBAAkB;EAClB,wDAAwD;EACxD,aAAa;CACd;;AAED;EACE,wBAAwB;EACxB,qBAAqB;EACrB,mBAAmB;EACnB,oBAAoB;EACpB,gBAAgB;EAChB,WAAW;CACZ","file":"Comment.css","sourcesContent":[".link {\n  color: inherit;\n}\n\n.link:hover {\n  text-decoration: none;\n  color: inherit;\n}\n\n.comment:hover{\n  box-shadow: 5px 5px 2.5px 0px rgba(0, 0, 0, 0.25);\n  transform: scale(1.2);\n  z-index: 1;\n}\n\n.comment {\n  composes: panel panel-default from 'bootstrap/dist/css/bootstrap.min.css';\n  box-shadow: 0 0px 0px rgba(0,0,0,0);\n  transition: all 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);;\n  position: relative;\n}\n\n.nsfw {\n  composes: text-danger from 'bootstrap/dist/css/bootstrap.min.css';\n  position: absolute;\n  top: 5px;\n  right: 10px;\n}\n\n.heading {\n  composes: panel-heading from 'bootstrap/dist/css/bootstrap.min.css';\n}\n\n.title {\n  composes: panel-title from 'bootstrap/dist/css/bootstrap.min.css';\n}\n\n.body {\n  composes: panel-body from 'bootstrap/dist/css/bootstrap.min.css';\n}\n\n.nsfwBody {\n  composes: body;\n  -webkit-filter: blur(5px);\n  -moz-filter: blur(5px);\n  -o-filter: blur(5px);\n  -ms-filter: blur(5px);\n  filter: blur(5px);\n  transition: all 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);;\n  opacity: 0.9;\n}\n\n.nsfwBody:hover {\n  -webkit-filter: blur(0);\n  -moz-filter: blur(0);\n  -o-filter: blur(0);\n  -ms-filter: blur(0);\n  filter: blur(0);\n  opacity: 1;\n}\n"],"sourceRoot":"webpack://"}]);
+	
+	// exports
+	exports.locals = {
+		"link": "Comment__link___V6Iif",
+		"comment": "Comment__comment____RZh8 " + __webpack_require__(2).locals["panel"] + " " + __webpack_require__(2).locals["panel-default"] + "",
+		"nsfw": "Comment__nsfw___d9LI4 " + __webpack_require__(2).locals["text-danger"] + "",
+		"heading": "Comment__heading___39KgZ " + __webpack_require__(2).locals["panel-heading"] + "",
+		"title": "Comment__title___2srDr " + __webpack_require__(2).locals["panel-title"] + "",
+		"body": "Comment__body___jc_fZ " + __webpack_require__(2).locals["panel-body"] + "",
+		"nsfwBody": "Comment__nsfwBody___3bNdX Comment__body___jc_fZ " + __webpack_require__(2).locals["panel-body"] + ""
+	};
 
 /***/ }
 /******/ ]);

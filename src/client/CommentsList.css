@@ -1,0 +1,8 @@
+.container {
+  composes: col-xs-12 from 'bootstrap/dist/css/bootstrap.min.css';
+  padding-top: 60px;
+}
+
+.list {
+  composes: list-unstyled from 'bootstrap/dist/css/bootstrap.min.css';
+}

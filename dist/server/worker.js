@@ -5,13 +5,9 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.work = undefined;
 
-var _IO = require('../shared/IO');
-
-var _IO2 = _interopRequireDefault(_IO);
-
 var _helpers = require('../shared/helpers');
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 var toJson = function toJson(r) {
   return r.json();
@@ -23,10 +19,21 @@ var getComments = function getComments(_ref) {
 var maker = function maker(_ref2) {
   var _ref2$data = _ref2.data;
   var body = _ref2$data.body;
+  var created = _ref2$data.created_utc;
   var author = _ref2$data.author;
   var id = _ref2$data.id;
-  var over_18 = _ref2$data.over_18;
-  return { body: body, author: author, id: id, over_18: over_18 };
+  var nsfw = _ref2$data.over_18;
+  var link = _ref2$data.link_url;
+  var op = _ref2$data.link_author;
+  return {
+    body: body,
+    author: author,
+    id: id,
+    nsfw: nsfw,
+    link: link,
+    op: op,
+    created: created
+  };
 };
 var toMakers = function toMakers(comments) {
   return comments.map(maker);
@@ -36,18 +43,18 @@ var seconds = function seconds(x) {
 };
 var indexById = function indexById(things) {
   return things.reduce(function (obj, thing) {
-    /*
-      eslint no-param-reassign: "off"
-    */
-    obj[thing.id] = thing;
-    return obj;
+    return Object.assign({}, obj, _defineProperty({}, thing.id, thing));
   }, {});
 };
 
-var work = exports.work = function work(State, Fetch, Logger) {
+var work = exports.work = function work(_ref3) {
+  var State = _ref3.State;
+  var Fetch = _ref3.Fetch;
+  var Logger = _ref3.Logger;
+
   Logger.ap('Fetching comments');
   return Fetch.map(toJson).map(getComments).map(toMakers).map(function (comments) {
-    (0, _helpers.run)(State.map((0, _helpers.pluck)('comments')).map((0, _helpers.merge)(indexById(comments))).map(function () {
+    return (0, _helpers.run)(State.map((0, _helpers.pluck)('comments')).map((0, _helpers.merge)(indexById(comments))).map(function () {
       return Logger.ap('Running State Update');
     }));
   }).map(function () {
@@ -55,6 +62,9 @@ var work = exports.work = function work(State, Fetch, Logger) {
   });
 };
 
-exports.default = function (State, Fetch, Logger) {
-  return (0, _helpers.repeat)(work(State, Fetch, Logger).map(Logger.ap('Worker running...'))).every(seconds(30));
+exports.default = function (_ref4) {
+  var State = _ref4.State;
+  var Fetch = _ref4.Fetch;
+  var Logger = _ref4.Logger;
+  return (0, _helpers.repeat)(work({ State: State, Fetch: Fetch, Logger: Logger }).map(Logger.ap('Worker running...'))).every(seconds(30));
 };

@@ -1,4 +1,3 @@
-import compose from 'ramda';
 import Container from './Container';
 
 const isAMonad = (x) => x.map && x.flatMap

@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.ok = exports.updateState = exports.log = exports.stringify = exports.emit = exports.on = exports.seedState = exports.middleware = exports.listen = exports.post = exports.perform = exports.json = exports.map = exports.merge = exports.set = exports.repeat = exports.run = exports.previousData = exports.currentData = exports.call = undefined;
+exports.ok = exports.updateState = exports.log = exports.stringify = exports.render = exports.emit = exports.on = exports.seedState = exports.middleware = exports.listen = exports.post = exports.perform = exports.get = exports.json = exports.merge = exports.set = exports.select = exports.toJson = exports.toArray = exports.repeat = exports.run = exports.previousData = exports.currentData = exports.map = exports.extract = exports.sort = exports.top = exports.call = undefined;
 exports.thunk = thunk;
 exports.pluck = pluck;
 exports.diff = diff;
@@ -13,6 +13,8 @@ var _shallowDiff2 = require('shallow-diff');
 var _shallowDiff3 = _interopRequireDefault(_shallowDiff2);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
@@ -42,6 +44,20 @@ function pluck(path) {
     return obj[path];
   };
 }
+var top = exports.top = function top(arr, num) {
+  return arr.slice(0, num);
+};
+var sort = exports.sort = function sort(arr, by) {
+  return arr.sort(function (x, y) {
+    return x[by] - y[by];
+  });
+};
+var extract = exports.extract = pluck('value');
+var map = exports.map = function map(f, x) {
+  return Array.isArray(x) ? x.map(f) : Object.keys(x).map(function (k) {
+    return f(x[k]);
+  });
+};
 var currentData = exports.currentData = function currentData(thing) {
   return pluck('currentData')(pluck('data')(thing));
 };
@@ -68,21 +84,27 @@ var repeat = exports.repeat = function repeat(io) {
     }
   };
 };
+var toArray = exports.toArray = function toArray(obj) {
+  return Object.keys(obj).map(function (k) {
+    return obj[k];
+  });
+};
+var toJson = exports.toJson = function toJson(pr) {
+  return pr.json();
+};
+var select = exports.select = call('select');
 var set = exports.set = call('set');
 var merge = exports.merge = call('merge');
-var map = exports.map = function map(functor, func) {
-  return function () {
-    return functor.map(func);
-  };
-};
 var json = exports.json = call('json');
-var perform = exports.perform = call('perform');
+var get = exports.get = call('get');
+var perform = exports.perform = call('perform')();
 var post = exports.post = call('post');
 var listen = exports.listen = call('listen');
 var middleware = exports.middleware = call('middleware');
 var seedState = exports.seedState = call('seedState');
 var on = exports.on = call('on');
 var emit = exports.emit = call('emit');
+var render = exports.render = call('render');
 var stringify = exports.stringify = call('stringify');
 var log = exports.log = call('log');
 var updateState = exports.updateState = call('updateState');
@@ -94,7 +116,6 @@ function diff(one, two) {
 
 
   return added.reduce(function (obj, key) {
-    obj[key] = two[key];
-    return obj;
+    return Object.assign({}, obj, _defineProperty({}, key, two[key]));
   }, {});
 }

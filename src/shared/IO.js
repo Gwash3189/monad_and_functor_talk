@@ -1,7 +1,4 @@
-import { compose } from 'ramda';
-
-const thunk = (x) => () => x
-const isAFunction = (x) => typeof x === 'function'
+const isAFunction = (x) => typeof x === 'function';
 
 const IO = (value) => {
   const val = isAFunction(value)
@@ -9,14 +6,16 @@ const IO = (value) => {
             : () => value;
 
   const api = {
-    value:  val,
-    perform: () => api.value(),
+    get value() {
+      return val();
+    },
+    perform: () => api.value,
     of: (x) => IO(x),
-    map: (func) => IO(compose(func, api.value)),
-    flatMap: (func) => IO(func(api.value()).value)
-  }
+    map: (func) => IO(() => func(api.value)),
+    flatMap: (func) => IO(func(api.value).value)
+  };
 
   return api;
-}
+};
 
-export default IO
+export default IO;

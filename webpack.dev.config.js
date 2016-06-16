@@ -1,4 +1,4 @@
-var webpack = require('webpack');
+const webpack = require('webpack');
 
 module.exports = {
   entry: './src/client/main.js',
@@ -20,7 +20,7 @@ module.exports = {
       {
         test: /\.js?$/,
         loaders: ['babel'],
-        include: __dirname + '/src/client'
+        include: __dirname + '/src'
       },
       {
         test: /\.css$/,
