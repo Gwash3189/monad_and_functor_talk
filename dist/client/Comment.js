@@ -71,6 +71,8 @@ var Comment = function (_Component) {
               'h3',
               { className: _Comment2.default.title },
               comment.author,
+              ' from /r/',
+              comment.subreddit.toLowerCase(),
               ' says...'
             )
           ),

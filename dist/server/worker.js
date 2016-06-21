@@ -20,6 +20,7 @@ var maker = function maker(_ref2) {
   var _ref2$data = _ref2.data;
   var body = _ref2$data.body;
   var created = _ref2$data.created_utc;
+  var subreddit = _ref2$data.subreddit;
   var author = _ref2$data.author;
   var id = _ref2$data.id;
   var nsfw = _ref2$data.over_18;
@@ -32,7 +33,8 @@ var maker = function maker(_ref2) {
     nsfw: nsfw,
     link: link,
     op: op,
-    created: created
+    created: created,
+    subreddit: subreddit
   };
 };
 var toMakers = function toMakers(comments) {

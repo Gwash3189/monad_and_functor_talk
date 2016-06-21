@@ -2,14 +2,15 @@ import { repeat, run, pluck, merge } from '../shared/helpers';
 
 const toJson = (r) => r.json();
 const getComments = ({ data: { children } }) => children;
-const maker = ({ data: { body, created_utc: created, author, id, over_18: nsfw, link_url: link, link_author: op } }) => ({
+const maker = ({ data: { body, created_utc: created, subreddit, author, id, over_18: nsfw, link_url: link, link_author: op } }) => ({
   body,
   author,
   id,
   nsfw,
   link,
   op,
-  created
+  created,
+  subreddit
 });
 const toMakers = (comments) => comments.map(maker);
 const seconds = (x) => x * 1000;

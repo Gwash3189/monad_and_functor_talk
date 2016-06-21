@@ -72,13 +72,15 @@ var CommentsList = function (_Component) {
       var comments = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
 
 
-      return Object.keys(comments).length > 0 ? _react2.default.createElement(
+      var coms = (0, _helpers.map)(function (comment) {
+        return _react2.default.createElement(_Comment2.default, { key: comment.id, comment: comment });
+      }, (0, _helpers.sort)((0, _helpers.top)((0, _helpers.toArray)(comments), 300), 'created'));
+
+      return _react2.default.createElement(
         'ul',
         { className: _CommentsList2.default.list },
-        (0, _helpers.top)((0, _helpers.map)(function (comment) {
-          return _react2.default.createElement(_Comment2.default, { key: comment.id, comment: comment });
-        }, (0, _helpers.sort)((0, _helpers.toArray)(comments), 'created'), 100))
-      ) : _react2.default.createElement('ul', { className: _CommentsList2.default.list });
+        coms
+      );
     }
   }, {
     key: 'render',

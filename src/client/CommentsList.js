@@ -37,20 +37,15 @@ class CommentsList extends Component {
 
   renderComments(comments = {}) {
 
-    return Object.keys(comments).length > 0
-      ? (
-        <ul className={styles.list}>
-          {
-            top(map(comment => {
-              return <Comment key={comment.id} comment={comment} />
-            }, sort(toArray(comments), 'created'), 100))
-          }
-        </ul>
-      )
-      : (
-        <ul className={styles.list}>
-        </ul>
-      );
+    const coms = map(comment => {
+      return <Comment key={comment.id} comment={comment} />
+    }, sort(top(toArray(comments), 300), 'created'));
+
+    return (
+      <ul className={styles.list}>
+        { coms }
+      </ul>
+    );
   }
 
   render() {

@@ -38,24 +38,31 @@ var tree = new _baobab2.default({ comments: {} });
 var app = (0, _express2.default)();
 var http = (0, _http.Server)(app);
 var socket = (0, _socket2.default)(http);
-var logger = function logger() {
-  var _console;
+var logger = function logger(name) {
+  return function () {
+    var _console;
 
-  for (var _len = arguments.length, x = Array(_len), _key = 0; _key < _len; _key++) {
-    x[_key] = arguments[_key];
-  }
+    for (var _len = arguments.length, x = Array(_len), _key = 0; _key < _len; _key++) {
+      x[_key] = arguments[_key];
+    }
 
-  (_console = console).log.apply(_console, x.concat([new Date()]));
-  return logger;
+    (_console = console).log.apply(_console, x.concat([new Date(), name]));
+    return logger;
+  };
 };
 
 exports.default = function (_ref) {
   var worker = _ref.worker;
   var api = _ref.api;
 
-  var Logger = (0, _Applicative2.default)(logger);
+  var ApiLogger = (0, _Applicative2.default)(logger('; API'));
+  var AskRedditLogger = (0, _Applicative2.default)(logger('; ASK REDDIT'));
+  var FunnyLogger = (0, _Applicative2.default)(logger('; FUNNY'));
+  var GW2Logger = (0, _Applicative2.default)(logger('; GW2'));
   var Socket = (0, _IO2.default)(socket);
-  var Fetch = (0, _Continuation2.default)('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
+  var AskReddit = (0, _Continuation2.default)('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
+  var Funny = (0, _Continuation2.default)('https://www.reddit.com/r/funny/comments/.json?limit=100');
+  var GW2 = (0, _Continuation2.default)('https://www.reddit.com/r/guildwars2/comments/.json?limit=100');
   var State = (0, _IO2.default)({ tree: tree, comments: tree.select('comments') });
 
   app.use(_express2.default.static(__dirname + '/public'));
@@ -73,11 +80,11 @@ exports.default = function (_ref) {
     next();
   });
 
-  (0, _helpers.run)(worker({ State: State, Fetch: Fetch, Logger: Logger }), api({
+  (0, _helpers.run)(worker({ State: State, Fetch: AskReddit, Logger: AskRedditLogger }), worker({ State: State, Fetch: Funny, Logger: FunnyLogger }), worker({ State: State, Fetch: GW2, Logger: GW2Logger }), api({
     app: app,
     Socket: Socket,
     http: http,
-    Logger: Logger,
+    Logger: ApiLogger,
     State: State
   }));
 };

@@ -26,7 +26,7 @@ export default class Comment extends Component {
           {this.nsfw(comment)}
           <div className={styles.heading}>
             <h3 className={styles.title}>
-              {comment.author} says...
+              {comment.author} from /r/{comment.subreddit.toLowerCase()} says...
             </h3>
           </div>
           <div className={this.nsfwBody(comment)}>

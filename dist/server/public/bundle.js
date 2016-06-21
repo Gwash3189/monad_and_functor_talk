@@ -74,7 +74,7 @@
 	
 	var _CommentsList2 = _interopRequireDefault(_CommentsList);
 	
-	var _helpers = __webpack_require__(232);
+	var _helpers = __webpack_require__(243);
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
@@ -32067,7 +32067,7 @@
 	
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 	
-	var _react = __webpack_require__(235);
+	var _react = __webpack_require__(232);
 	
 	var _react2 = _interopRequireDefault(_react);
 	
@@ -32075,15 +32075,15 @@
 	
 	var bootstrap = _interopRequireWildcard(_bootstrapMin);
 	
-	var _CommentsList = __webpack_require__(241);
+	var _CommentsList = __webpack_require__(238);
 	
 	var _CommentsList2 = _interopRequireDefault(_CommentsList);
 	
-	var _Comment = __webpack_require__(243);
+	var _Comment = __webpack_require__(240);
 	
 	var _Comment2 = _interopRequireDefault(_Comment);
 	
-	var _helpers = __webpack_require__(232);
+	var _helpers = __webpack_require__(243);
 	
 	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
 	
@@ -32133,13 +32133,15 @@
 	      var comments = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
 	
 	
-	      return Object.keys(comments).length > 0 ? _react2.default.createElement(
+	      var coms = (0, _helpers.map)(function (comment) {
+	        return _react2.default.createElement(_Comment2.default, { key: comment.id, comment: comment });
+	      }, (0, _helpers.sort)((0, _helpers.top)((0, _helpers.toArray)(comments), 300), 'created'));
+	
+	      return _react2.default.createElement(
 	        'ul',
 	        { className: _CommentsList2.default.list },
-	        (0, _helpers.top)((0, _helpers.map)(function (comment) {
-	          return _react2.default.createElement(_Comment2.default, { key: comment.id, comment: comment });
-	        }, (0, _helpers.sort)((0, _helpers.toArray)(comments), 'created'), 100))
-	      ) : _react2.default.createElement('ul', { className: _CommentsList2.default.list });
+	        coms
+	      );
 	    }
 	  }, {
 	    key: 'render',
@@ -32180,278 +32182,11 @@
 
 	'use strict';
 	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	exports.ok = exports.updateState = exports.log = exports.stringify = exports.render = exports.emit = exports.on = exports.seedState = exports.middleware = exports.listen = exports.post = exports.perform = exports.get = exports.json = exports.merge = exports.set = exports.select = exports.toJson = exports.toArray = exports.repeat = exports.run = exports.previousData = exports.currentData = exports.map = exports.extract = exports.sort = exports.top = exports.call = undefined;
-	exports.thunk = thunk;
-	exports.pluck = pluck;
-	exports.diff = diff;
-	
-	var _shallowDiff2 = __webpack_require__(233);
-	
-	var _shallowDiff3 = _interopRequireDefault(_shallowDiff2);
-	
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-	
-	function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-	
-	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-	
-	function thunk(x) {
-	  return function () {
-	    return x;
-	  };
-	}
-	var call = exports.call = function call(verb) {
-	  for (var _len = arguments.length, firstArgs = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-	    firstArgs[_key - 1] = arguments[_key];
-	  }
-	
-	  return function () {
-	    for (var _len2 = arguments.length, secondArgs = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-	      secondArgs[_key2] = arguments[_key2];
-	    }
-	
-	    return function (app) {
-	      app[verb].apply(app, _toConsumableArray(firstArgs.concat(secondArgs)));
-	      return app;
-	    };
-	  };
-	};
-	function pluck(path) {
-	  return function plucked(obj) {
-	    return obj[path];
-	  };
-	}
-	var top = exports.top = function top(arr, num) {
-	  return arr.slice(0, num);
-	};
-	var sort = exports.sort = function sort(arr, by) {
-	  return arr.sort(function (x, y) {
-	    return x[by] - y[by];
-	  });
-	};
-	var extract = exports.extract = pluck('value');
-	var map = exports.map = function map(f, x) {
-	  return Array.isArray(x) ? x.map(f) : Object.keys(x).map(function (k) {
-	    return f(x[k]);
-	  });
-	};
-	var currentData = exports.currentData = function currentData(thing) {
-	  return pluck('currentData')(pluck('data')(thing));
-	};
-	var previousData = exports.previousData = function previousData(thing) {
-	  return pluck('previousData')(pluck('data')(thing));
-	};
-	var run = exports.run = function run() {
-	  for (var _len3 = arguments.length, IOs = Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
-	    IOs[_key3] = arguments[_key3];
-	  }
-	
-	  return IOs.forEach(function (io) {
-	    return io.perform();
-	  });
-	};
-	var repeat = exports.repeat = function repeat(io) {
-	  return {
-	    every: function every(time) {
-	      return io.map(function () {
-	        return setInterval(function () {
-	          return run(io);
-	        }, time);
-	      });
-	    }
-	  };
-	};
-	var toArray = exports.toArray = function toArray(obj) {
-	  return Object.keys(obj).map(function (k) {
-	    return obj[k];
-	  });
-	};
-	var toJson = exports.toJson = function toJson(pr) {
-	  return pr.json();
-	};
-	var select = exports.select = call('select');
-	var set = exports.set = call('set');
-	var merge = exports.merge = call('merge');
-	var json = exports.json = call('json');
-	var get = exports.get = call('get');
-	var perform = exports.perform = call('perform')();
-	var post = exports.post = call('post');
-	var listen = exports.listen = call('listen');
-	var middleware = exports.middleware = call('middleware');
-	var seedState = exports.seedState = call('seedState');
-	var on = exports.on = call('on');
-	var emit = exports.emit = call('emit');
-	var render = exports.render = call('render');
-	var stringify = exports.stringify = call('stringify');
-	var log = exports.log = call('log');
-	var updateState = exports.updateState = call('updateState');
-	var ok = exports.ok = thunk({ ok: 'ok' });
-	function diff(one, two) {
-	  var _shallowDiff = (0, _shallowDiff3.default)(one, two);
-	
-	  var added = _shallowDiff.added;
-	
-	
-	  return added.reduce(function (obj, key) {
-	    return Object.assign({}, obj, _defineProperty({}, key, two[key]));
-	  }, {});
-	}
+	module.exports = __webpack_require__(233);
+
 
 /***/ },
 /* 233 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * @license shallow-diff https://github.com/cosmosio/shallow-diff
-	 *
-	 * The MIT License (MIT)
-	 *
-	 * Copyright (c) 2014-2015 Olivier Scherrer <pode.fr@gmail.com>
-	 */
-	"use strict";
-	
-	function assert(assertion, error) {
-	    if (assertion) {
-	        throw new TypeError("simple-loop: " + error);
-	    }
-	}
-	
-	var loop = __webpack_require__(234);
-	
-	/**
-	 * Make a diff between two objects
-	 * @param {Array/Object} base the base object
-	 * @param {Array/Object} compared the object to compare the base with
-	 * @example:
-	 *  With objects:
-	 *
-	 *  base = {a:1, b:2, c:3, d:4, f:6}
-	 *  compared = {a:1, b:20, d: 4, e: 5}
-	 *  will return :
-	 *  {
-	 *      unchanged: ["a", "d"],
-	 *      updated: ["b"],
-	 *      deleted: ["f"],
-	 *      added: ["e"]
-	 *  }
-	 *
-	 * It also works with Arrays:
-	 *
-	 *  base = [10, 20, 30]
-	 *  compared = [15, 20]
-	 *  will return :
-	 *  {
-	 *      unchanged: [1],
-	 *      updated: [0],
-	 *      deleted: [2],
-	 *      added: []
-	 *  }
-	 *
-	 * @returns object
-	 */
-	module.exports = function shallowDiff(base, compared) {
-	    assert(typeof base != "object", "the first object to compare with shallowDiff needs to be an object");
-	    assert(typeof compared != "object", "the second object to compare with shallowDiff needs to be an object");
-	
-	    var unchanged = [],
-	        updated = [],
-	        deleted = [],
-	        added = [];
-	
-	    // Loop through the compared object
-	    loop(compared, function(value, idx) {
-	        // To get the added items
-	        if (!(idx in base)) {
-	            added.push(idx);
-	
-	        // The updated items
-	        } else if (value !== base[idx]) {
-	            updated.push(idx);
-	
-	        // And the unchanged
-	        } else if (value === base[idx]) {
-	            unchanged.push(idx);
-	        }
-	    });
-	
-	    // Loop through the before object
-	    loop(base, function(value, idx) {
-	        // To get the deleted items
-	        if (!(idx in compared)) {
-	            deleted.push(idx);
-	        }
-	    });
-	
-	    return {
-	        updated: updated,
-	        unchanged: unchanged,
-	        added: added,
-	        deleted: deleted
-	    };
-	};
-
-
-/***/ },
-/* 234 */
-/***/ function(module, exports) {
-
-	/**
-	 * @license simple-loop https://github.com/flams/simple-loop
-	 *
-	 * The MIT License (MIT)
-	 *
-	 * Copyright (c) 2014-2015 Olivier Scherrer <pode.fr@gmail.com>
-	 */
-	"use strict";
-	
-	function assert(assertion, error) {
-	    if (assertion) {
-	        throw new TypeError("simple-loop: " + error);
-	    }
-	}
-	
-	/**
-	 * Small abstraction for looping over objects and arrays
-	 * Warning: it's not meant to be used with nodeList
-	 * To use with nodeList, convert to array first
-	 * @param {Array/Object} iterated the array or object to loop through
-	 * @param {Function} callback the function to execute for each iteration
-	 * @param {Object} scope the scope in which to execute the callback
-	 */
-	module.exports = function loop(iterated, callback, scope) {
-	    assert(typeof iterated != "object", "iterated must be an array/object");
-	    assert(typeof callback != "function", "callback must be a function");
-	
-	    var i;
-	
-	    if (Array.isArray(iterated)) {
-	        for (i = 0; i < iterated.length; i++) {
-	            callback.call(scope, iterated[i], i, iterated);
-	        }
-	    } else {
-	        for (i in iterated) {
-	            if (iterated.hasOwnProperty(i)) {
-	                callback.call(scope, iterated[i], i, iterated);
-	            }
-	        }
-	    }
-	};
-
-
-/***/ },
-/* 235 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-	
-	module.exports = __webpack_require__(236);
-
-
-/***/ },
-/* 236 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -32472,13 +32207,13 @@
 	var ReactChildren = __webpack_require__(105);
 	var ReactComponent = __webpack_require__(134);
 	var ReactClass = __webpack_require__(133);
-	var ReactDOMFactories = __webpack_require__(237);
+	var ReactDOMFactories = __webpack_require__(234);
 	var ReactElement = __webpack_require__(98);
-	var ReactElementValidator = __webpack_require__(238);
+	var ReactElementValidator = __webpack_require__(235);
 	var ReactPropTypes = __webpack_require__(97);
 	var ReactVersion = __webpack_require__(166);
 	
-	var onlyChild = __webpack_require__(240);
+	var onlyChild = __webpack_require__(237);
 	var warning = __webpack_require__(25);
 	
 	var createElement = ReactElement.createElement;
@@ -32543,7 +32278,7 @@
 	module.exports = React;
 
 /***/ },
-/* 237 */
+/* 234 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -32560,9 +32295,9 @@
 	'use strict';
 	
 	var ReactElement = __webpack_require__(98);
-	var ReactElementValidator = __webpack_require__(238);
+	var ReactElementValidator = __webpack_require__(235);
 	
-	var mapObject = __webpack_require__(239);
+	var mapObject = __webpack_require__(236);
 	
 	/**
 	 * Create a factory that creates HTML tag elements.
@@ -32724,7 +32459,7 @@
 	module.exports = ReactDOMFactories;
 
 /***/ },
-/* 238 */
+/* 235 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -33010,7 +32745,7 @@
 	module.exports = ReactElementValidator;
 
 /***/ },
-/* 239 */
+/* 236 */
 /***/ function(module, exports) {
 
 	/**
@@ -33065,7 +32800,7 @@
 	module.exports = mapObject;
 
 /***/ },
-/* 240 */
+/* 237 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -33103,13 +32838,13 @@
 	module.exports = onlyChild;
 
 /***/ },
-/* 241 */
+/* 238 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(242);
+	var content = __webpack_require__(239);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
 	var update = __webpack_require__(9)(content, {});
@@ -33129,7 +32864,7 @@
 	}
 
 /***/ },
-/* 242 */
+/* 239 */
 /***/ function(module, exports, __webpack_require__) {
 
 	exports = module.exports = __webpack_require__(3)();
@@ -33146,7 +32881,7 @@
 	};
 
 /***/ },
-/* 243 */
+/* 240 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -33157,7 +32892,7 @@
 	
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 	
-	var _react = __webpack_require__(235);
+	var _react = __webpack_require__(232);
 	
 	var _react2 = _interopRequireDefault(_react);
 	
@@ -33165,7 +32900,7 @@
 	
 	var bootstrap = _interopRequireWildcard(_bootstrapMin);
 	
-	var _Comment = __webpack_require__(244);
+	var _Comment = __webpack_require__(241);
 	
 	var _Comment2 = _interopRequireDefault(_Comment);
 	
@@ -33222,6 +32957,8 @@
 	              'h3',
 	              { className: _Comment2.default.title },
 	              comment.author,
+	              ' from /r/',
+	              comment.subreddit.toLowerCase(),
 	              ' says...'
 	            )
 	          ),
@@ -33241,13 +32978,13 @@
 	exports.default = Comment;
 
 /***/ },
-/* 244 */
+/* 241 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(245);
+	var content = __webpack_require__(242);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
 	var update = __webpack_require__(9)(content, {});
@@ -33267,7 +33004,7 @@
 	}
 
 /***/ },
-/* 245 */
+/* 242 */
 /***/ function(module, exports, __webpack_require__) {
 
 	exports = module.exports = __webpack_require__(3)();
@@ -33287,6 +33024,273 @@
 		"body": "Comment__body___jc_fZ " + __webpack_require__(2).locals["panel-body"] + "",
 		"nsfwBody": "Comment__nsfwBody___3bNdX Comment__body___jc_fZ " + __webpack_require__(2).locals["panel-body"] + ""
 	};
+
+/***/ },
+/* 243 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	  value: true
+	});
+	exports.ok = exports.updateState = exports.log = exports.stringify = exports.render = exports.emit = exports.on = exports.seedState = exports.middleware = exports.listen = exports.post = exports.perform = exports.get = exports.json = exports.merge = exports.set = exports.select = exports.toJson = exports.toArray = exports.repeat = exports.run = exports.previousData = exports.currentData = exports.map = exports.extract = exports.sort = exports.top = exports.call = undefined;
+	exports.thunk = thunk;
+	exports.pluck = pluck;
+	exports.diff = diff;
+	
+	var _shallowDiff2 = __webpack_require__(244);
+	
+	var _shallowDiff3 = _interopRequireDefault(_shallowDiff2);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+	
+	function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+	
+	function thunk(x) {
+	  return function () {
+	    return x;
+	  };
+	}
+	var call = exports.call = function call(verb) {
+	  for (var _len = arguments.length, firstArgs = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+	    firstArgs[_key - 1] = arguments[_key];
+	  }
+	
+	  return function () {
+	    for (var _len2 = arguments.length, secondArgs = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+	      secondArgs[_key2] = arguments[_key2];
+	    }
+	
+	    return function (app) {
+	      app[verb].apply(app, _toConsumableArray(firstArgs.concat(secondArgs)));
+	      return app;
+	    };
+	  };
+	};
+	function pluck(path) {
+	  return function plucked(obj) {
+	    return obj[path];
+	  };
+	}
+	var top = exports.top = function top(arr, num) {
+	  return arr.slice(0, num);
+	};
+	var sort = exports.sort = function sort(arr, by) {
+	  return arr.sort(function (x, y) {
+	    return x[by] - y[by];
+	  });
+	};
+	var extract = exports.extract = pluck('value');
+	var map = exports.map = function map(f, x) {
+	  return Array.isArray(x) ? x.map(f) : Object.keys(x).map(function (k) {
+	    return f(x[k]);
+	  });
+	};
+	var currentData = exports.currentData = function currentData(thing) {
+	  return pluck('currentData')(pluck('data')(thing));
+	};
+	var previousData = exports.previousData = function previousData(thing) {
+	  return pluck('previousData')(pluck('data')(thing));
+	};
+	var run = exports.run = function run() {
+	  for (var _len3 = arguments.length, IOs = Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+	    IOs[_key3] = arguments[_key3];
+	  }
+	
+	  return IOs.forEach(function (io) {
+	    return io.perform();
+	  });
+	};
+	var repeat = exports.repeat = function repeat(io) {
+	  return {
+	    every: function every(time) {
+	      return io.map(function () {
+	        return setInterval(function () {
+	          return run(io);
+	        }, time);
+	      });
+	    }
+	  };
+	};
+	var toArray = exports.toArray = function toArray(obj) {
+	  return Object.keys(obj).map(function (k) {
+	    return obj[k];
+	  });
+	};
+	var toJson = exports.toJson = function toJson(pr) {
+	  return pr.json();
+	};
+	var select = exports.select = call('select');
+	var set = exports.set = call('set');
+	var merge = exports.merge = call('merge');
+	var json = exports.json = call('json');
+	var get = exports.get = call('get');
+	var perform = exports.perform = call('perform')();
+	var post = exports.post = call('post');
+	var listen = exports.listen = call('listen');
+	var middleware = exports.middleware = call('middleware');
+	var seedState = exports.seedState = call('seedState');
+	var on = exports.on = call('on');
+	var emit = exports.emit = call('emit');
+	var render = exports.render = call('render');
+	var stringify = exports.stringify = call('stringify');
+	var log = exports.log = call('log');
+	var updateState = exports.updateState = call('updateState');
+	var ok = exports.ok = thunk({ ok: 'ok' });
+	function diff(one, two) {
+	  var _shallowDiff = (0, _shallowDiff3.default)(one, two);
+	
+	  var added = _shallowDiff.added;
+	
+	
+	  return added.reduce(function (obj, key) {
+	    return Object.assign({}, obj, _defineProperty({}, key, two[key]));
+	  }, {});
+	}
+
+/***/ },
+/* 244 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/**
+	 * @license shallow-diff https://github.com/cosmosio/shallow-diff
+	 *
+	 * The MIT License (MIT)
+	 *
+	 * Copyright (c) 2014-2015 Olivier Scherrer <pode.fr@gmail.com>
+	 */
+	"use strict";
+	
+	function assert(assertion, error) {
+	    if (assertion) {
+	        throw new TypeError("simple-loop: " + error);
+	    }
+	}
+	
+	var loop = __webpack_require__(245);
+	
+	/**
+	 * Make a diff between two objects
+	 * @param {Array/Object} base the base object
+	 * @param {Array/Object} compared the object to compare the base with
+	 * @example:
+	 *  With objects:
+	 *
+	 *  base = {a:1, b:2, c:3, d:4, f:6}
+	 *  compared = {a:1, b:20, d: 4, e: 5}
+	 *  will return :
+	 *  {
+	 *      unchanged: ["a", "d"],
+	 *      updated: ["b"],
+	 *      deleted: ["f"],
+	 *      added: ["e"]
+	 *  }
+	 *
+	 * It also works with Arrays:
+	 *
+	 *  base = [10, 20, 30]
+	 *  compared = [15, 20]
+	 *  will return :
+	 *  {
+	 *      unchanged: [1],
+	 *      updated: [0],
+	 *      deleted: [2],
+	 *      added: []
+	 *  }
+	 *
+	 * @returns object
+	 */
+	module.exports = function shallowDiff(base, compared) {
+	    assert(typeof base != "object", "the first object to compare with shallowDiff needs to be an object");
+	    assert(typeof compared != "object", "the second object to compare with shallowDiff needs to be an object");
+	
+	    var unchanged = [],
+	        updated = [],
+	        deleted = [],
+	        added = [];
+	
+	    // Loop through the compared object
+	    loop(compared, function(value, idx) {
+	        // To get the added items
+	        if (!(idx in base)) {
+	            added.push(idx);
+	
+	        // The updated items
+	        } else if (value !== base[idx]) {
+	            updated.push(idx);
+	
+	        // And the unchanged
+	        } else if (value === base[idx]) {
+	            unchanged.push(idx);
+	        }
+	    });
+	
+	    // Loop through the before object
+	    loop(base, function(value, idx) {
+	        // To get the deleted items
+	        if (!(idx in compared)) {
+	            deleted.push(idx);
+	        }
+	    });
+	
+	    return {
+	        updated: updated,
+	        unchanged: unchanged,
+	        added: added,
+	        deleted: deleted
+	    };
+	};
+
+
+/***/ },
+/* 245 */
+/***/ function(module, exports) {
+
+	/**
+	 * @license simple-loop https://github.com/flams/simple-loop
+	 *
+	 * The MIT License (MIT)
+	 *
+	 * Copyright (c) 2014-2015 Olivier Scherrer <pode.fr@gmail.com>
+	 */
+	"use strict";
+	
+	function assert(assertion, error) {
+	    if (assertion) {
+	        throw new TypeError("simple-loop: " + error);
+	    }
+	}
+	
+	/**
+	 * Small abstraction for looping over objects and arrays
+	 * Warning: it's not meant to be used with nodeList
+	 * To use with nodeList, convert to array first
+	 * @param {Array/Object} iterated the array or object to loop through
+	 * @param {Function} callback the function to execute for each iteration
+	 * @param {Object} scope the scope in which to execute the callback
+	 */
+	module.exports = function loop(iterated, callback, scope) {
+	    assert(typeof iterated != "object", "iterated must be an array/object");
+	    assert(typeof callback != "function", "callback must be a function");
+	
+	    var i;
+	
+	    if (Array.isArray(iterated)) {
+	        for (i = 0; i < iterated.length; i++) {
+	            callback.call(scope, iterated[i], i, iterated);
+	        }
+	    } else {
+	        for (i in iterated) {
+	            if (iterated.hasOwnProperty(i)) {
+	                callback.call(scope, iterated[i], i, iterated);
+	            }
+	        }
+	    }
+	};
+
 
 /***/ }
 /******/ ]);

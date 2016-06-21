@@ -11,15 +11,18 @@ const tree = new Baobab({ comments: {} });
 const app = express();
 const http = Server(app);
 const socket = socketIO(http);
-const logger = (...x) => {
-  console.log(...x, new Date());
+const logger = (name) => (...x) => {
+  console.log(...x, new Date(), name);
   return logger;
 };
 
 export default ({ worker, api }) => {
-  const Logger = Applicative(logger);
+  const ApiLogger = Applicative(logger('; API'));
+  const AskRedditLogger = Applicative(logger('; ASK REDDIT'));
+  const FunnyLogger = Applicative(logger('; FUNNY'));
   const Socket = IO(socket);
-  const Fetch = Continuation('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
+  const AskReddit = Continuation('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
+  const Funny = Continuation('https://www.reddit.com/r/funny/comments/.json?limit=100');
   const State = IO({ tree, comments: tree.select('comments') });
 
   app.use(express.static(`${__dirname}/public`));
@@ -38,12 +41,13 @@ export default ({ worker, api }) => {
   });
 
   run(
-    worker({ State, Fetch, Logger }),
+    worker({ State, Fetch: AskReddit, Logger: AskRedditLogger }),
+    worker({ State, Fetch: Funny, Logger: FunnyLogger }),
     api({
       app,
       Socket,
       http,
-      Logger,
+      Logger: ApiLogger,
       State
     })
   );
