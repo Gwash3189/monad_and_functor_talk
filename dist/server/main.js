@@ -55,14 +55,12 @@ exports.default = function (_ref) {
   var worker = _ref.worker;
   var api = _ref.api;
 
-  var ApiLogger = (0, _Applicative2.default)(logger('; API'));
-  var AskRedditLogger = (0, _Applicative2.default)(logger('; ASK REDDIT'));
-  var FunnyLogger = (0, _Applicative2.default)(logger('; FUNNY'));
-  var GW2Logger = (0, _Applicative2.default)(logger('; GW2'));
+  var ApiLogger = (0, _Applicative2.default)(logger('API:'));
+  var AskRedditLogger = (0, _Applicative2.default)(logger('ASK REDDIT:'));
+  var FunnyLogger = (0, _Applicative2.default)(logger('FUNNY:'));
   var Socket = (0, _IO2.default)(socket);
   var AskReddit = (0, _Continuation2.default)('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
   var Funny = (0, _Continuation2.default)('https://www.reddit.com/r/funny/comments/.json?limit=100');
-  var GW2 = (0, _Continuation2.default)('https://www.reddit.com/r/guildwars2/comments/.json?limit=100');
   var State = (0, _IO2.default)({ tree: tree, comments: tree.select('comments') });
 
   app.use(_express2.default.static(__dirname + '/public'));
@@ -80,7 +78,7 @@ exports.default = function (_ref) {
     next();
   });
 
-  (0, _helpers.run)(worker({ State: State, Fetch: AskReddit, Logger: AskRedditLogger }), worker({ State: State, Fetch: Funny, Logger: FunnyLogger }), worker({ State: State, Fetch: GW2, Logger: GW2Logger }), api({
+  (0, _helpers.run)(worker({ State: State, Fetch: AskReddit, Logger: AskRedditLogger }), worker({ State: State, Fetch: Funny, Logger: FunnyLogger }), api({
     app: app,
     Socket: Socket,
     http: http,

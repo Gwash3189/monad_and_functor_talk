@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "npm run serve",
     "serve": "node ./dist/server/index.js",
     "serve:debug": "node debug ./dist/server/index.js",
     "serve:repl": "node ./dist/server/repl.js",

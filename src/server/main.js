@@ -17,9 +17,9 @@ const logger = (name) => (...x) => {
 };
 
 export default ({ worker, api }) => {
-  const ApiLogger = Applicative(logger('; API'));
-  const AskRedditLogger = Applicative(logger('; ASK REDDIT'));
-  const FunnyLogger = Applicative(logger('; FUNNY'));
+  const ApiLogger = Applicative(logger('API:'));
+  const AskRedditLogger = Applicative(logger('ASK REDDIT:'));
+  const FunnyLogger = Applicative(logger('FUNNY:'));
   const Socket = IO(socket);
   const AskReddit = Continuation('https://www.reddit.com/r/AskReddit/comments/.json?limit=100');
   const Funny = Continuation('https://www.reddit.com/r/funny/comments/.json?limit=100');

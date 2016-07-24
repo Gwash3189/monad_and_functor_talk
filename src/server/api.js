@@ -13,8 +13,8 @@ export default ({ app, Socket, http, Logger, State }) => {
   app.get('/comments', (req, res) => {
     run(
       State
-      .map(pluck('comments'))
-      .map(comments => res.map(json(comments.get())))
+        .map(pluck('comments'))
+        .map(comments => res.map(json(comments.get())))
     );
   });
 
